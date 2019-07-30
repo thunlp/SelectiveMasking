@@ -150,7 +150,7 @@ def main():
     print("output_files", output_files)
 
     print("loading lookup table")
-    lookup_table = np.load(args.lookup)
+    lookup_table = np.load(args.lookup, allow_pickle=True)
     shard_files(output_files, instance_ids, lookup_table, input_files)
 
 

@@ -11,10 +11,10 @@ DUPE_FACTOR=5
 DO_LOWER_CASE="True"
 N_LINES_PER_SHARD_APPROX=396000   # Default=396000 creates 256 shards
 
-N_PROCS_PREPROCESS=4    # Adjust this based on memory requirements and available number of cores
+N_PROCS_PREPROCESS=56    # Adjust this based on memory requirements and available number of cores
 
-BERT_BASE_DIR="/workspace/bert/vocab/uncased_L-12_H-768_A-12"
-BERT_LARGE_DIR="/workspace/bert/vocab/uncased_L-24_H-1024_A-16"
+BERT_BASE_DIR="/home/gyx/nvidia-bert/vocab/uncased_L-12_H-768_A-12"
+BERT_LARGE_DIR="/home/gyx/nvidia-bert/vocab/uncased_L-24_H-1024_A-16"
 
 if [ "$USE_BERT_LARGE" = true ] ; then
   VOCAB_FILE="${BERT_LARGE_DIR}/vocab.txt"

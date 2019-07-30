@@ -22,7 +22,7 @@ fi
 # Wikiextractor.py - Creates lots of folders/files in "doc format"
 echo "Running Wikiextractor"
 mkdir -p ./extracted_articles
-/workspace/wikiextractor/WikiExtractor.py ./raw_data/wikidump.xml -b 1000M --processes ${N_PROCS_PREPROCESS} -o ./extracted_articles
+$HOME/wikiextractor/WikiExtractor.py ./raw_data/wikidump.xml -b 1000M --processes ${N_PROCS_PREPROCESS} -o ./extracted_articles
 
 # Remove XML Tags and extraneous titles (since they are not sentences)
 # Also clean to remove lines between paragraphs within article and use space-separated articles

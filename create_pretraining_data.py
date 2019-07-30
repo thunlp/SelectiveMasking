@@ -73,7 +73,7 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
   features["input_ids"] = np.zeros([num_instances, max_seq_length], dtype="int32")
   features["input_mask"] = np.zeros([num_instances, max_seq_length], dtype="int32")
   features["segment_ids"] = np.zeros([num_instances, max_seq_length], dtype="int32")
-  features["masked_lm_positions"] =  np.zeros([num_instances, max_predictions_per_seq], dtype="int32")
+  features["masked_lm_positions"] = np.zeros([num_instances, max_predictions_per_seq], dtype="int32")
   features["masked_lm_ids"] = np.zeros([num_instances, max_predictions_per_seq], dtype="int32")
   features["next_sentence_labels"] = np.zeros(num_instances, dtype="int32")
 
@@ -404,7 +404,7 @@ def main():
                         help="Bert pre-trained model selected in the list: bert-base-uncased, "
                               "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese.")
 
-    #int 
+    # int 
     parser.add_argument("--max_seq_length",
                         default=128,
                         type=int,
@@ -451,7 +451,7 @@ def main():
     if os.path.isfile(args.input_file):
       input_files.append(args.input_file)
     elif os.path.isdir(args.input_file):
-      input_files = [os.path.join(args.input_file, f) for f in os.listdir(args.input_file) if (os.path.isfile(os.path.join(args.input_file, f)) and f.endswith('.txt') )]
+      input_files = [os.path.join(args.input_file, f) for f in os.listdir(args.input_file) if (os.path.isfile(os.path.join(args.input_file, f)) and f.endswith('.txt'))]
     else:
       raise ValueError("{} is not a valid path".format(args.input_file))
 
