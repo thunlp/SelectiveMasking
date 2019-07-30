@@ -3,6 +3,7 @@
 import hashlib
 import urllib.request
 import zipfile
+import ssl
 
 # Download urls
 model_urls = {
@@ -103,7 +104,11 @@ for model in model_urls:
     file = model_urls[model][1]
 
     print("Downloading", url)
-    response = urllib.request.urlopen(url)
+    req = urllib.request.Request(url)
+    req.add_header(
+        'User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko')
+    response = urllib.request.urlopen(
+        req, context=ssl._create_unverified_context())
     print("OK")
     with open(file, "wb") as handle:
         handle.write(response.read())
