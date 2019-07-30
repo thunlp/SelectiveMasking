@@ -35,4 +35,4 @@ bash create_datasets_from_start.sh bookcorpus ./bookcorpus/bookcorpus.txt \
   && rm -r ./bookcorpus/final_* \
 
 # Create HDF5 files for inter sequence-pair mixed Wikipedia and Bookcorpus
-bash merge_datasets_after_creation.sh merged_wiki+books wikipedia_corpus/hdf5_shards,bookcorpus/hdf5_shards 1024
+bash merge_datasets_after_creation.sh merged_wiki+books wikipedia_corpus/hdf5_shards,bookcorpus/hdf5_shards 384

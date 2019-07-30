@@ -9,7 +9,7 @@ OUTPUT_DIR=${TARGET_DIR}/hdf5_shards
 mkdir -p ${OUTPUT_DIR}
 
 OUTPUT_FILE="${OUTPUT_DIR}/${SHARD_INDEX}.hdf5"
-
+echo "Bert model: ${BERT_MODEL}"
 python3 $HOME/nvidia-bert/create_pretraining_data.py \
   --input_file=${INPUT_FILE} \
   --output_file=${OUTPUT_FILE} \
@@ -19,5 +19,6 @@ python3 $HOME/nvidia-bert/create_pretraining_data.py \
   --max_predictions_per_seq=${MAX_PREDICTIONS_PER_SEQUENCE} \
   --masked_lm_prob=${MASKED_LM_PROB} \
   --random_seed=${SEED} \
-  --dupe_factor=${DUPE_FACTOR}
+  --dupe_factor=${DUPE_FACTOR}\
+  --bert_model=${BERT_MODEL}
 

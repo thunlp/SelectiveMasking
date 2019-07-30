@@ -16,10 +16,10 @@ seed=${12:-42}
 job_name=${13:-"job"}
 
 
-DATASET=small_wiki_5m # change this for other datasets
+DATASET=small_wiki_5m_base # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
-BERT_CONFIG=bert_config/bert_large_config.json
+BERT_CONFIG=bert_config/bert_base_config.json
 RESULTS_DIR=${HOME}/nvidia-bert/results
 CHECKPOINTS_DIR=${HOME}/nvidia-bert/results/checkpoints
 
@@ -69,7 +69,7 @@ CMD=" /home/gyx/nvidia-bert/run_pretraining.py"
 CMD+=" --input_dir=$DATA_DIR"
 CMD+=" --output_dir=$CHECKPOINTS_DIR"
 CMD+=" --config_file=$BERT_CONFIG"
-CMD+=" --bert_model=bert-large-uncased"
+CMD+=" --bert_model=bert-base-uncased"
 CMD+=" --train_batch_size=$train_batch_size"
 CMD+=" --max_seq_length=512"
 CMD+=" --max_predictions_per_seq=80"

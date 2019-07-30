@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-#==================
+# ==================
 import csv
 import os
 import logging
@@ -45,7 +45,7 @@ from optimization import BertAdam, BertAdam_FP16
 from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 
 from apex.optimizers import FusedAdam #, FP16_Optimizer
-#from apex.optimizers import FusedAdam
+# from apex.optimizers import FusedAdam
 from apex.parallel import DistributedDataParallel as DDP
 from schedulers import LinearWarmUpScheduler
 
@@ -263,8 +263,8 @@ def main():
 
         optimizer = FusedAdam(optimizer_grouped_parameters,
                                     lr=args.learning_rate,
-                                    #warmup=args.warmup_proportion,
-                                    #t_total=args.max_steps,
+                                    # warmup=args.warmup_proportion,
+                                    # t_total=args.max_steps,
                                     bias_correction=False,
                                     weight_decay=0.01,
                                     max_grad_norm=1.0)
@@ -352,7 +352,7 @@ def main():
                     loss = loss / args.gradient_accumulation_steps
 
                 if args.fp16:
-                #   optimizer.backward(loss)
+                    # optimizer.backward(loss)
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
                 else:
@@ -389,7 +389,7 @@ def main():
                        
                         torch.save({'model' : model_to_save.state_dict(), 
                                 'optimizer' : optimizer.state_dict(), 
-                                'files' : [f_id] + files }, output_save_file)
+                                'files' : [f_id] + files}, output_save_file)
                                 
                         most_recent_ckpts_paths.append(output_save_file)
                         if len(most_recent_ckpts_paths) > 3:
@@ -406,7 +406,7 @@ def main():
             del train_dataloader
             del train_sampler
             del train_data       
-            #for obj in gc.get_objects():
+            # for obj in gc.get_objects():
             #  if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
             #    del obj
 
