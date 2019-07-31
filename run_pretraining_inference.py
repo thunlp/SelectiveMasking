@@ -19,7 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 
-#==================
+# ==================
 import csv
 import os
 import logging
@@ -188,7 +188,7 @@ def main():
 
 
     if args.ckpt_step == -1:
-        #retrieve latest model
+        # retrieve latest model
         model_names = [f for f in os.listdir(args.ckpt_dir) if f.endswith(".model")]
         args.ckpt_step = max([int(x.split('.model')[0].split('_')[1].strip()) for x in model_names])
         print("load model saved at iteraton", args.ckpt_step)
@@ -218,7 +218,7 @@ def main():
     print("Evaluation. . .")
     
     nb_instances = 0
-    max_steps = args.max_steps if args.max_steps > 0  else np.inf
+    max_steps = args.max_steps if args.max_steps > 0 else np.inf
     global_step = 0
 
     
@@ -226,7 +226,7 @@ def main():
         if args.do_eval:
             final_loss = 0.0 # 
             for data_file in files:
-                logger.info("file %s" %( data_file))
+                logger.info("file %s" %(data_file))
                 dataset = pretraining_dataset(input_file=data_file, max_pred_length=args.max_predictions_per_seq)
                 if not multi_gpu_training:
                     train_sampler = RandomSampler(dataset)
@@ -262,7 +262,7 @@ def main():
             #     torch.distributed.barrier()
             # start_t0 = time.time()
             for data_file in files:
-                logger.info("file %s" %( data_file))
+                logger.info("file %s" %(data_file))
                 dataset = pretraining_dataset(input_file=data_file, max_pred_length=args.max_predictions_per_seq)
                 if not multi_gpu_training:
                     train_sampler = RandomSampler(dataset)

@@ -2,13 +2,12 @@
 
 echo "Container nvidia build = " $NVIDIA_BUILD_ID
 
-DATASET=wikipedia_corpus # change this for other datasets
+DATASET=wiki_eval # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
-BERT_CONFIG=bert_config.json
-RESULTS_DIR=/results
-CHECKPOINTS_DIR=/results/checkpoints
-
+BERT_CONFIG=bert_config/bert_base_config.json
+RESULTS_DIR=$HOME/nvidia-bert/results
+CHECKPOINTS_DIR=$HOME/nvidia-bert/results/checkpoints
 
 if [ ! -d "$DATA_DIR" ] ; then
    echo "Warning! $DATA_DIR directory missing. Inference cannot start"
@@ -62,7 +61,7 @@ CMD=" /home/gyx/nvidia-bert/run_pretraining_inference.py"
 CMD+=" --input_dir=$DATA_DIR"
 CMD+=" --ckpt_dir=$CHECKPOINTS_DIR"
 CMD+=" --config_file=$BERT_CONFIG"
-CMD+=" --bert_model=bert-large-uncased"
+CMD+=" --bert_model=bert-base-uncased"
 CMD+=" --eval_batch_size=$eval_batch_size"
 CMD+=" --max_seq_length=512"
 CMD+=" --max_predictions_per_seq=80"

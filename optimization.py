@@ -19,7 +19,7 @@ import torch
 from torch.optim import Optimizer
 from torch.optim.optimizer import required
 from torch.nn.utils import clip_grad_norm_
-#from fused_adam_local import FusedAdam
+# from fused_adam_local import FusedAdam
 from apex.optimizers import FusedAdam
 
 def warmup_cosine(x, warmup=0.002):
@@ -37,7 +37,7 @@ def warmup_linear(x, warmup=0.002):
         return x/warmup
     # return (1.0 - x)
 
-    return max((x - 1. )/ (warmup - 1.), 0.) 
+    return max((x - 1.)/ (warmup - 1.), 0.) 
 
 SCHEDULES = {
     'warmup_cosine':warmup_cosine,

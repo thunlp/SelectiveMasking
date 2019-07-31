@@ -924,7 +924,8 @@ def main():
     model.to(device)
     if args.fp16 and args.old:
         model.half()
-        # Prepare optimizer
+    
+    # Prepare optimizer
     param_optimizer = list(model.named_parameters())
 
     # hack to remove pooler, which is not used
@@ -971,7 +972,6 @@ def main():
                                     warmup=args.warmup_proportion,
                                     t_total=num_train_optimization_steps)
 
-    #print(model)
     if args.local_rank != -1:
         try:
             from apex.parallel import DistributedDataParallel as DDP
@@ -1065,8 +1065,7 @@ def main():
                     global_step += 1
                 if step % args.log_freq == 0:
                     # logger.info("Step {}: Loss {}, LR {} ".format(global_step, loss.item(), lr_this_step))
-                    logger.info(
-                        "Step {}: Loss {}, LR {} ".format(global_step, loss.item(), optimizer.param_groups[0]['lr']))
+                    logger.info("Step {}: Loss {}, LR {} ".format(global_step, loss.item(), optimizer.param_groups[0]['lr']))
 
     if args.do_train:
         # Save a trained model and the associated configuration
