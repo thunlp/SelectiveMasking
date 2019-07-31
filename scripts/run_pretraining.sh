@@ -20,8 +20,8 @@ DATASET=wiki_train # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
 BERT_CONFIG=bert_config/bert_base_config.json
-RESULTS_DIR=${HOME}/nvidia-bert/results
-CHECKPOINTS_DIR=${HOME}/nvidia-bert/results/checkpoints
+RESULTS_DIR=${HOME}/nvidia-bert/results_test
+CHECKPOINTS_DIR=${HOME}/nvidia-bert/results_test/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 

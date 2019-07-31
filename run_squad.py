@@ -956,8 +956,7 @@ def main():
                 if args.old:
                     optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
                 else:
-                    model, optimizer = amp.initialize(model, optimizer, opt_level="O2", keep_batchnorm_fp32=False,
-                                                      loss_scale="dynamic")
+                    model, optimizer = amp.initialize(model, optimizer, opt_level="O2", keep_batchnorm_fp32=False, loss_scale="dynamic")
             else:
                 if args.old:
                     optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)

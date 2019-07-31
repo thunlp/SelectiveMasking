@@ -16,7 +16,7 @@ import torch
 import torch.nn.functional as F
 from schedulers import LinearWarmUpScheduler
 from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
-from modeling import (CONFIG_NAME, WEIGHTS_NAME, BertConfig, BertForTokenClassification)
+from modeling import (CONFIG_NAME, WEIGHTS_NAME, BertConfig, BertForTokenClassification, BertPreTrainedModel, BertModel)
 from optimization import BertAdam, warmup_linear
 from tokenization import BertTokenizer
 from seqeval.metrics import classification_report
@@ -32,23 +32,25 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message
 logger = logging.getLogger(__name__)
 
 
-class Ner(BertForTokenClassification):
+class Ner(BertPreTrainedModel):
     def __init__(self, config, num_labels):
-        super(Ner, self).__init__(config, num_labels)
+        super(Ner, self).__init__(config)
+        self.num_labels = num_labels
+        self.bert = BertModel(config)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.classifier = nn.Linear(config.hidden_size, num_labels)
+        self.apply(self.init_bert_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, labels=None, valid_ids=None, attention_mask_label=None):
-        sequence_output, _ = self.bert(
-            input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False)
+        sequence_output, _ = self.bert(input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False)
         batch_size, max_len, feat_dim = sequence_output.shape
-        valid_output = torch.zeros(
-            batch_size, max_len, feat_dim, dtype=torch.float32, device='cuda')
+        valid_output = torch.zeros(batch_size, max_len, feat_dim, dtype=torch.float16, device='cuda') #NOTE dtype must be 16!!!!
         for i in range(batch_size):
             jj = -1
             for j in range(max_len):
                 if valid_ids[i][j].item() == 1:
                     jj += 1
                     valid_output[i][jj] = sequence_output[i][j]
-        sequence_output = self.dropout(valid_output)
         logits = self.classifier(sequence_output)
 
         if labels is not None:
@@ -386,20 +388,9 @@ def main():
                         type=int, 
                         default=50,
                         help='frequency of logging loss.')
-    # parser.add_argument('--server_ip', type=str, default='',
-                        # help="Can be used for distant debugging.")
-    # parser.add_argument('--server_port', type=str, default='',
-                        # help="Can be used for distant debugging.")
     args = parser.parse_args()
 
-    # if args.server_ip and args.server_port:
-    #     # Distant debugging - see https://code.visualstudio.com/docs/python/debugging#_attach-to-a-local-script
-    #     import ptvsd
-    #     print("Waiting for debugger attach")
-    #     ptvsd.enable_attach(
-    #         address=(args.server_ip, args.server_port), redirect_output=True)
-    #     ptvsd.wait_for_attach()
-
+    # Ner data processor
     processors = {"ner": NerProcessor}
 
     if args.local_rank == -1 or args.no_cuda:
@@ -423,10 +414,11 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+    if n_gpu > 0:
+        torch.cuda.manual_seed_all(args.seed)
 
     if not args.do_train and not args.do_eval:
-        raise ValueError(
-            "At least one of `do_train` or `do_eval` must be True.")
+        raise ValueError("At least one of `do_train` or `do_eval` must be True.")
 
     # if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train:
         # raise ValueError(
@@ -455,8 +447,6 @@ def main():
             num_train_optimization_steps = num_train_optimization_steps // torch.distributed.get_world_size()
 
     # Prepare model
-    # cache_dir = args.cache_dir if args.cache_dir else os.path.join(str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank))
-    # model = Ner.from_pretrained(args.bert_model, cache_dir=cache_dir, num_labels=num_labels)
     config = BertConfig.from_json_file(args.config_file)
     model = Ner(config, num_labels=num_labels)
     model.load_state_dict(torch.load(args.init_checkpoint, map_location='cpu'), strict=False)
@@ -468,43 +458,43 @@ def main():
 
     # Prepare optimizer
     param_optimizer = list(model.named_parameters())
+    param_optimizer = [n for n in param_optimizer if 'pooler' not in n[0]]
+
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
     optimizer_grouped_parameters = [
         {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
-    if args.fp16:
-        try:
-            # from fused_adam_local import FusedAdamBert as FusedAdam
-            from apex.optimizers import FP16_Optimizer
-            from apex.optimizers import FusedAdam
-        except ImportError:
-            raise ImportError(
-                "Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
-
-        optimizer = FusedAdam(optimizer_grouped_parameters,
-                              lr=args.learning_rate,
-                              bias_correction=False,
-                              max_grad_norm=1.0)
-        
-        if args.loss_scale == 0:
-            if args.old:
-                optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
+    if args.do_train:
+        if args.fp16:
+            try:
+                # from fused_adam_local import FusedAdamBert as FusedAdam
+                from apex.optimizers import FP16_Optimizer
+                from apex.optimizers import FusedAdam
+            except ImportError:
+                raise ImportError(
+                    "Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
+            optimizer = FusedAdam(optimizer_grouped_parameters,
+                                  lr=args.learning_rate,
+                                  bias_correction=False,
+                                  max_grad_norm=1.0)
+            if args.loss_scale == 0:
+                if args.old:
+                    optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
+                else:
+                    model, optimizer = amp.initialize(model, optimizer, opt_level="O2", keep_batchnorm_fp32=False, loss_scale="dynamic")
             else:
-                model, optimizer = amp.initialize(model, optimizer, opt_level="O2", keep_batchnorm_fp32=False, loss_scale="dynamic")
+                if args.old:
+                    optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
+                else:
+                    model, optimizer = amp.initialize(model, optimizer, opt_level="O2", keep_batchnorm_fp32=False, loss_scale=args.loss_scale)
+            if not args.old and args.do_train:
+                scheduler = LinearWarmUpScheduler(optimizer, warmup=args.warmup_proportion, total_steps=num_train_optimization_steps)
         else:
-            if args.old:
-                optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
-            else:
-                model, optimizer = amp.initialize(model, optimizer, opt_level="O2", keep_batchnorm_fp32=False, loss_scale=args.loss_scale)
-        if not args.old and args.do_train:
-            scheduler = LinearWarmUpScheduler(optimizer, warmup=args.warmup_proportion, total_steps=num_train_optimization_steps)
-
-    else:
-        optimizer = BertAdam(optimizer_grouped_parameters,
-                             lr=args.learning_rate,
-                             warmup=args.warmup_proportion,
-                             t_total=num_train_optimization_steps)
+            optimizer = BertAdam(optimizer_grouped_parameters,
+                                 lr=args.learning_rate,
+                                 warmup=args.warmup_proportion,
+                                 t_total=num_train_optimization_steps)
 
     if args.local_rank != -1:
         try:
@@ -512,7 +502,6 @@ def main():
         except ImportError:
             raise ImportError(
                 "Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
-
         model = DDP(model)
     elif n_gpu > 1:
         model = torch.nn.DataParallel(model)
@@ -579,8 +568,8 @@ def main():
                             scheduler.step()
                         else:
                             lr_this_step = args.learning_rate * warmup_linear(global_step, args.warmup_proportion)
-                        for param_group in optimizer.param_groups:
-                            param_group['lr'] = lr_this_step
+                            for param_group in optimizer.param_groups:
+                                param_group['lr'] = lr_this_step
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
@@ -588,7 +577,7 @@ def main():
                 if step % args.log_freq == 0:
                     logger.info("Step {}: Loss {}, LR {} ".format(global_step, loss.item(), optimizer.param_groups[0]['lr']))
 
-
+    if args.do_train:
         # Save a trained model and the associated configuration
         model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
         output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME)
@@ -612,6 +601,10 @@ def main():
     model.to(device)
 
     if args.do_eval and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
+        
+        if not args.do_train and args.fp16:
+            model.half()
+        
         eval_examples = processor.get_test_examples(args.data_dir)
         eval_features = convert_examples_to_features(
             eval_examples, label_list, args.max_seq_length, tokenizer)

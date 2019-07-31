@@ -4,7 +4,7 @@ init_checkpoint=${1:-"$HOME/checkpoints/bert_uncased.pt"}
 epochs=${2:-"2.0"}
 batch_size=${3:-"3"}
 learning_rate=${4:-"3e-5"}
-precision=${5:-"fp32"}
+precision=${5:-"fp16"}
 num_gpu=${6:-"8"}
 seed=${7:-"1"}
 conll_dir=${8:-"/home/gyx/nvidia-bert/data/CoNll"}
@@ -79,13 +79,4 @@ if [ "$mode" != "eval" ]; then
 throughput=`cat $LOGFILE | grep -E 'Iteration.*[0-9.]+(it/s)' | tail -1 | egrep -o '[0-9.]+(s/it|it/s)' | head -1 | egrep -o '[0-9.]+'`
 train_perf=$(awk 'BEGIN {print ('$throughput' * '$num_gpu' * '$batch_size')}')
 echo " training throughput: $train_perf"
-fi
-
-if [ "$mode" != "train" ]; then
-    if [ "$mode" != "prediction" ]; then
-        python $squad_dir/evaluate-v1.1.py $squad_dir/dev-v1.1.json $OUT_DIR/predictions.json |& tee -a $LOGFILE
-        eval_throughput=`cat $LOGFILE | grep Evaluating | tail -1 | awk -F ','  '{print $2}' | egrep -o '[0-9.]+' | head -1 | egrep -o '[0-9.]+'`
-        eval_perf=$(awk 'BEGIN {print ('$eval_throughput' * '$num_gpu' * '$batch_size')}')
-        echo " evaluation throughput: $eval_perf"
-    fi
 fi
