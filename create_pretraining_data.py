@@ -29,6 +29,7 @@ import tokenization as tokenization
 
 import random
 import collections
+# import mask_generators
 
 class A:
     def __init__(self):
@@ -139,10 +140,85 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
     f.create_dataset("next_sentence_labels", data=features["next_sentence_labels"], dtype='i1', compression='gzip')
     f.flush()
     f.close()
-      
+
+def tokenize(tokenizer, line):
+    words = line.strip().split(" ")
+    tokens = []
+    valid_positions = []
+    for i, word in enumerate(words):
+        token = tokenizer.tokenize(word)
+        tokens.extend(token)
+        for i in range(len(token)):
+            if i == 0:
+                valid_positions.append(1)
+            else:
+                valid_positions.append(0)
+    return tokens, valid_positions
+
+def create_better_mask(tokens, valid_positions, masked_lm_prob, max_predictions_rate, vocab_words, rng):
+    """Creates the predictions for the masked LM objective."""
+    # NOTE this sequence is defined as the sequence after concatenation after devided by 2, the final mask number should be OK
+    max_predictions_sub_seq = len(tokens) * max_predictions_rate
+    cand_indexes = []
+    # save all word parts tokenized from a single word in a list
+    for (i, valid) in enumerate(valid_positions):
+        if valid == 1:
+            cand_indexes.append([i])
+        else:
+            cand_indexes[-1].append(i)
+    # for (i, token) in enumerate(tokens):
+        # if token == "[CLS]" or token == "[SEP]":
+            # continue
+        # cand_indexes.append(i)
+
+    rng.shuffle(cand_indexes)
+
+    # output_tokens = list(tokens)
+
+    # NOTE changed to len(cand_indexes) * masked_lm_prob
+    num_to_predict = min(max_predictions_sub_seq, max(1, int(round(len(cand_indexes) * masked_lm_prob))))
+
+    masked_info = ["" for token in tokens] # if masked, masked symbol, else ""
+    masked_lms_len = 0
+    # covered_indexes = set()
+    for indexes in cand_indexes:
+        if masked_lms_len >= num_to_predict:
+            break
+        # if index in covered_indexes:
+        #   continue
+        # covered_indexes.add(index)
+
+        masked_tokens = None
+        # 80% of the time, replace with [MASK]
+        if rng.random() < 0.8:
+            masked_tokens = ["[MASK]" for index in indexes]
+        else:
+            # 10% of the time, keep original
+            if rng.random() < 0.5:
+                masked_tokens = [tokens[index] for index in indexes]
+            # 10% of the time, replace with random word
+            else:
+                masked_tokens = [vocab_words[rng.randint(0, len(vocab_words) - 1)] for index in indexes]
+
+        for (i, index) in enumerate(indexes):
+            masked_info[index] = masked_tokens[i]
+
+        # masked_lms.extend([MaskedLmInstance(index=index, label=tokens[index]) for index in indexes])
+
+    # masked_lms = sorted(masked_lms, key=lambda x: x.index)
+
+    # masked_lm_positions = []
+    # masked_lm_labels = []
+    # for p in masked_lms:
+        # masked_lm_positions.append(p.index)
+        # masked_lm_labels.append(p.label)
+
+    return masked_info
+
 def create_training_instances(input_files, tokenizer, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
     """Create `TrainingInstance`s from raw text."""
     all_documents = [[]]
+    vocab_words = list(tokenizer.vocab.keys())
 
     # Input file format:
     # (1) One sentence per line. These should ideally be actual sentences, not
@@ -162,15 +238,19 @@ def create_training_instances(input_files, tokenizer, max_seq_length, dupe_facto
                 # Empty lines are used as document delimiters
                 if not line:
                     all_documents.append([])
-                tokens = tokenizer.tokenize(line)
+
+                # tokenize
+                # tokens = tokenizer.tokenize(line)
+
+                tokens, valid_positions = tokenize(tokenizer, line)
+                m_info = create_better_mask(tokens, valid_positions, masked_lm_prob, max_predictions_per_seq / max_seq_length, vocab_words, rng)
                 if tokens:
-                    all_documents[-1].append(tokens)
+                    all_documents[-1].append(MaskedTokenInstance(tokens=tokens, info=m_info))
 
     # Remove empty documents
     all_documents = [x for x in all_documents if x]
     rng.shuffle(all_documents)
 
-    vocab_words = list(tokenizer.vocab.keys())
     instances = []
     for _ in range(dupe_factor):
       for document_index in range(len(all_documents)):
@@ -185,6 +265,8 @@ def create_instances_from_document(
     all_documents, document_index, max_seq_length, short_seq_prob,
     masked_lm_prob, max_predictions_per_seq, vocab_words, rng):
     """Creates `TrainingInstance`s for a single document."""
+
+    # document: MaskedTokenInstance: (tokens, info)
     document = all_documents[document_index]
 
     # Account for [CLS], [SEP], [SEP]
@@ -211,9 +293,9 @@ def create_instances_from_document(
     current_length = 0
     i = 0
     while i < len(document):
-        segment = document[i]
+        segment = document[i] # segment: MaskedTokenInstance (tokens, info)
         current_chunk.append(segment)
-        current_length += len(segment)
+        current_length += len(segment.tokens)
         if i == len(document) - 1 or current_length >= target_seq_length:
             if current_chunk:
                 # `a_end` is how many segments from `current_chunk` go into the `A`
@@ -223,10 +305,13 @@ def create_instances_from_document(
                     a_end = rng.randint(1, len(current_chunk) - 1)
 
                 tokens_a = []
+                m_info_a = []
                 for j in range(a_end):
-                    tokens_a.extend(current_chunk[j])
+                    tokens_a.extend(current_chunk[j].tokens)
+                    m_info_a.extend(current_chunk[j].info)
 
                 tokens_b = []
+                m_info_b = []
                 # Random next
                 is_random_next = False
                 if len(current_chunk) == 1 or rng.random() < 0.5:
@@ -245,7 +330,8 @@ def create_instances_from_document(
                     random_document = all_documents[random_document_index]
                     random_start = rng.randint(0, len(random_document) - 1)
                     for j in range(random_start, len(random_document)):
-                      tokens_b.extend(random_document[j])
+                      tokens_b.extend(random_document[j].tokens)
+                      m_info_b.extend(random_document[j].info)
                       if len(tokens_b) >= target_b_length:
                         break
                     # We didn't actually use these segments so we "put them back" so
@@ -256,32 +342,50 @@ def create_instances_from_document(
                 else:
                     is_random_next = False
                     for j in range(a_end, len(current_chunk)):
-                        tokens_b.extend(current_chunk[j])
-                truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng)
+                        tokens_b.extend(current_chunk[j].tokens)
+                        m_info_b.extend(current_chunk[j].info)
+
+                truncate_seq_pair(tokens_a, m_info_a, tokens_b, m_info_b, max_num_tokens, rng)
 
                 assert len(tokens_a) >= 1
                 assert len(tokens_b) >= 1
 
                 tokens = []
+                m_info = []
                 segment_ids = []
                 tokens.append("[CLS]")
+                m_info.append("")
                 segment_ids.append(0)
-                for token in tokens_a:
+                for token, info in zip(tokens_a, m_info_a):
                     tokens.append(token)
+                    m_info.append(info)
                     segment_ids.append(0)
 
                 tokens.append("[SEP]")
+                m_info.append("")
                 segment_ids.append(0)
 
-                for token in tokens_b:
+                for token, info in zip(tokens_b, m_info_b):
                     tokens.append(token)
+                    m_info.append(info)
                     segment_ids.append(1)
                 tokens.append("[SEP]")
+                m_info.append("")
                 segment_ids.append(1)
 
-                (tokens, masked_lm_positions,
-                 masked_lm_labels) = create_masked_lm_predictions(
-                     tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng)
+                masked_lm_positions = [index for index in range(len(m_info)) if m_info[index]]
+                if len(masked_lm_positions) > max_predictions_per_seq:
+                    rng.shuffle(masked_lm_positions)
+                    masked_lm_positions = masked_lm_positions[0:max_predictions_per_seq]
+                    masked_lm_positions.sort()
+                masked_lm_labels = [m_info[pos] for pos in masked_lm_positions]
+                
+                for (pos, label) in zip(masked_lm_positions, masked_lm_labels):
+                    tokens[pos] = label                   
+                
+
+                # (tokens, masked_lm_positions, masked_lm_labels) = create_masked_lm_predictions(
+                    #  tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng)
                 instance = TrainingInstance(
                     tokens=tokens,
                     segment_ids=segment_ids,
@@ -289,6 +393,7 @@ def create_instances_from_document(
                     masked_lm_positions=masked_lm_positions,
                     masked_lm_labels=masked_lm_labels)
                 instances.append(instance)
+                # print(tokens, masked_lm_positions, masked_lm_labels)
             current_chunk = []
             current_length = 0
         i += 1
@@ -296,9 +401,8 @@ def create_instances_from_document(
     return instances
 
 
-MaskedLmInstance = collections.namedtuple("MaskedLmInstance",
-                                          ["index", "label"])
-
+MaskedLmInstance = collections.namedtuple("MaskedLmInstance", ["index", "label"])
+MaskedTokenInstance = collections.namedtuple("MaskedTokenInstance", ["tokens", "info"])
 
 def create_masked_lm_predictions(tokens, masked_lm_prob,
                                  max_predictions_per_seq, vocab_words, rng):
@@ -318,13 +422,13 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
                          max(1, int(round(len(tokens) * masked_lm_prob))))
 
     masked_lms = []
-    covered_indexes = set()
+    # covered_indexes = set()
     for index in cand_indexes:
         if len(masked_lms) >= num_to_predict:
           break
-        if index in covered_indexes:
-          continue
-        covered_indexes.add(index)
+        # if index in covered_indexes:
+        #   continue
+        # covered_indexes.add(index)
 
         masked_token = None
         # 80% of the time, replace with [MASK]
@@ -352,27 +456,24 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
 
     return (output_tokens, masked_lm_positions, masked_lm_labels)
 
-
-def create_better_masked(tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng):
-    """Creates the predictions for the masked LM objective."""
-
-
-def truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng):
+def truncate_seq_pair(tokens_a, m_info_a, tokens_b, m_info_b, max_num_tokens, rng):
     """Truncates a pair of sequences to a maximum sequence length."""
     while True:
         total_length = len(tokens_a) + len(tokens_b)
         if total_length <= max_num_tokens:
             break
 
-        trunc_tokens = tokens_a if len(tokens_a) > len(tokens_b) else tokens_b
+        (trunc_tokens, trunc_info) = (tokens_a, m_info_a) if len(tokens_a) > len(tokens_b) else (tokens_b, m_info_b)
         assert len(trunc_tokens) >= 1
 
         # We want to sometimes truncate from the front and sometimes from the
         # back to add more randomness and avoid biases.
         if rng.random() < 0.5:
             del trunc_tokens[0]
+            del trunc_info[0]
         else:
             trunc_tokens.pop()
+            trunc_info.pop()
 
 
 def main():
@@ -452,6 +553,8 @@ def main():
         input_files = [os.path.join(args.input_file, f) for f in os.listdir(args.input_file) if (os.path.isfile(os.path.join(args.input_file, f)) and f.endswith('.txt'))]
     else:
         raise ValueError("{} is not a valid path".format(args.input_file))
+
+    print(args)
 
     rng = random.Random(args.random_seed)
     instances = create_training_instances(
