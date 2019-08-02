@@ -29,7 +29,7 @@ import tokenization as tokenization
 
 import random
 import collections
-# import mask_generators
+import mask_utils.mask_generators
 
 class A:
     def __init__(self):
@@ -155,23 +155,28 @@ def tokenize(tokenizer, line):
                 valid_positions.append(0)
     return tokens, valid_positions
 
-def create_better_mask(tokens, valid_positions, masked_lm_prob, max_predictions_rate, vocab_words, rng):
+def create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked_lm_prob, max_predictions_rate, vocab_words, rng):
     """Creates the predictions for the masked LM objective."""
     # NOTE this sequence is defined as the sequence after concatenation after devided by 2, the final mask number should be OK
     max_predictions_sub_seq = len(tokens) * max_predictions_rate
     cand_indexes = []
     # save all word parts tokenized from a single word in a list
-    for (i, valid) in enumerate(valid_positions):
-        if valid == 1:
-            cand_indexes.append([i])
-        else:
-            cand_indexes[-1].append(i)
-    # for (i, token) in enumerate(tokens):
-        # if token == "[CLS]" or token == "[SEP]":
-            # continue
-        # cand_indexes.append(i)
-
-    rng.shuffle(cand_indexes)
+    if task_name:
+        for index in signi_indexes:
+            cand_indexes.append([index])
+            i = index + 1
+            while valid_positions[i] == 0:
+                cand_indexes[-1].append(i)
+                i += 1
+    else:
+        # using default strategy to choose mask positions
+        # randomly shuffle all indices
+        for (i, valid) in enumerate(valid_positions):
+            if valid == 1:
+                cand_indexes.append([i])
+            else:
+                cand_indexes[-1].append(i)
+        rng.shuffle(cand_indexes)
 
     # output_tokens = list(tokens)
 
@@ -215,7 +220,7 @@ def create_better_mask(tokens, valid_positions, masked_lm_prob, max_predictions_
 
     return masked_info
 
-def create_training_instances(input_files, tokenizer, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
+def create_training_instances(input_files, task_name, tokenizer, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
     """Create `TrainingInstance`s from raw text."""
     all_documents = [[]]
     vocab_words = list(tokenizer.vocab.keys())
@@ -241,9 +246,12 @@ def create_training_instances(input_files, tokenizer, max_seq_length, dupe_facto
 
                 # tokenize
                 # tokens = tokenizer.tokenize(line)
-
+                signi_indexes = []
+                if task_name:
+                    generator = getattr(mask_generators, task_name)
+                    signi_indexes = generator(line)
                 tokens, valid_positions = tokenize(tokenizer, line)
-                m_info = create_better_mask(tokens, valid_positions, masked_lm_prob, max_predictions_per_seq / max_seq_length, vocab_words, rng)
+                m_info = create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked_lm_prob, max_predictions_per_seq / max_seq_length, vocab_words, rng)
                 if tokens:
                     all_documents[-1].append(MaskedTokenInstance(tokens=tokens, info=m_info))
 
@@ -253,8 +261,8 @@ def create_training_instances(input_files, tokenizer, max_seq_length, dupe_facto
 
     instances = []
     for _ in range(dupe_factor):
-      for document_index in range(len(all_documents)):
-        instances.extend(create_instances_from_document(all_documents, document_index, max_seq_length, short_seq_prob,
+        for document_index in range(len(all_documents)):
+            instances.extend(create_instances_from_document(all_documents, document_index, max_seq_length, short_seq_prob,
                 masked_lm_prob, max_predictions_per_seq, vocab_words, rng))
 
     rng.shuffle(instances)
@@ -499,10 +507,18 @@ def main():
     ## Other parameters
 
     # str
-    parser.add_argument("--bert_model", default="bert-large-uncased", type=str, required=False,
+    parser.add_argument("--bert_model", 
+                        default="bert-large-uncased", 
+                        type=str, 
+                        required=False,
                         help="Bert pre-trained model selected in the list: bert-base-uncased, "
                               "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese.")
-
+    parser.add_argument("--task_name", 
+                        default="", 
+                        type=str,
+                        required=False,
+                        help="Use specific task to generate better mask. If does not specify a task, "
+                                "mask will be randomly chose as original version")
     # int 
     parser.add_argument("--max_seq_length",
                         default=128,
@@ -558,7 +574,7 @@ def main():
 
     rng = random.Random(args.random_seed)
     instances = create_training_instances(
-        input_files, tokenizer, args.max_seq_length, args.dupe_factor,
+        input_files, args.task_name, tokenizer, args.max_seq_length, args.dupe_factor,
         args.short_seq_prob, args.masked_lm_prob, args.max_predictions_per_seq,
         rng)
 

@@ -1,8 +1,8 @@
 import torch
-from mask_utils import *
+from mask_utils.utils import *
 
 
-from ner_model import NerModel
+# from ner_model import NerModel
 from torch import nn
 mask_samp = 100
 mask_rate = 0
@@ -20,4 +20,3 @@ class Ner(nn.Module):
 
         mask_indices = []
         return mask_indices
-
