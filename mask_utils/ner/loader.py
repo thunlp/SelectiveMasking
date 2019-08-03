@@ -1,12 +1,14 @@
 from __future__ import print_function, division
+import sys
 import os
 import re
 import codecs
 import unicodedata
 from utils import create_dico, create_mapping, zero_digits
 from utils import iob2, iob_iobes
-from mask_utils import display_diff, data_mask
-import model
+sys.path.append("..")
+from global_utils import display_diff, data_mask, load_bert_sentences
+import model as model
 import string
 import random
 import numpy as np
@@ -17,7 +19,6 @@ def unicodeToAscii(s):
         c for c in unicodedata.normalize('NFD', s)
         if unicodedata.category(c) != 'Mn' and c in string.ascii_letters + " .,;'-"
     )
-
 
 def load_sentences(path, lower, zeros):
     """
@@ -42,6 +43,41 @@ def load_sentences(path, lower, zeros):
             sentences.append(sentence)
     return sentences
 
+def prepare_mapping(train_file, dev_file, test_file, bert_data_dir, lower, zeros, pre_emb_file, word_dim):
+    sens_train = load_sentences(train_file, lower, zeros)
+    sens_dev = load_sentences(dev_file, lower, zeros)
+    sens_test = load_sentences(test_file, lower, zeros)
+    # raw sentences from CoNLL file
+    raw_sentences = [[x[0] for x in s] for s in (sens_train + sens_dev + sens_test)]
+    # raw sentences from bert trainning file
+    raw_sentences.extend(load_bert_sentences(bert_data_dir, zeros))
+    
+    dico_words_train = raw_word_mapping(raw_sentences, lower)[0]
+    dico_words = dico_words_train.copy()
+    pretrained = set([
+        line.rstrip().split()[0].strip()
+        for line in codecs.open(pre_emb_file, 'r', 'utf-8')
+        if len(pre_emb_file) > 0
+    ])
+    for word in pretrained:
+        if word not in dico_words:
+            dico_words[word] = 0
+    word_to_id, id_to_word = create_mapping(dico_words)
+
+    all_word_embeds = {}
+    for i, line in enumerate(codecs.open(pre_emb_file, 'r', 'utf-8')):
+        s = line.strip().split()
+        if len(s) == word_dim + 1:
+            all_word_embeds[s[0]] = np.array([float(i) for i in s[1:]])
+    word_embeds = np.random.uniform(-np.sqrt(0.06), np.sqrt(0.06), (len(word_to_id), word_dim))
+
+    for w in word_to_id:
+        if w in all_word_embeds:
+            word_embeds[word_to_id[w]] = all_word_embeds[w]
+        elif w.lower() in all_word_embeds:
+            word_embeds[word_to_id[w]] = all_word_embeds[w.lower()]
+    print('Loaded %i pretrained embeddings.' % len(all_word_embeds))
+
 
 def update_tag_scheme(sentences, tag_scheme):
     """
@@ -65,6 +101,21 @@ def update_tag_scheme(sentences, tag_scheme):
                 word[-1] = new_tag
         else:
             raise Exception('Unknown tagging scheme!')
+
+def raw_word_mapping(sentences, lower):
+    """ sentence in sentences, each sentence: [word1, word2, ...] """
+
+    words = [[x.lower() if lower else x for x in s] for s in sentences]
+    dico = create_dico(words)
+    dico['<PAD>'] = 10000001
+    dico['<UNK>'] = 10000000
+    dico = {k: v for k, v in dico.items() if v >= 3}
+    # word_to_id, id_to_word = create_mapping(dico)
+
+    print("Found %i unique words (%i in total)" % (
+        len(dico), sum(len(x) for x in words)
+    ))
+    return dico
 
 
 def word_mapping(sentences, lower):
@@ -154,7 +205,7 @@ def prepare_sentence(str_words, word_to_id, char_to_id, lower=False):
     }
 
 
-def prepare_dataset(sentences, word_to_id, char_to_id, tag_to_id, lower=True, mask_num=0, mask_rate=0, mask_samp=1):
+def prepare_dataset(sentences, word_to_id, char_to_id, tag_to_id, lower=True, mask_num=0, mask_rate=0, mask_samp=0):
     """
     Prepare the dataset. Return a list of lists of dictionaries containing:
         - word indexes

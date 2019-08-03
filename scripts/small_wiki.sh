@@ -17,5 +17,4 @@ python3 ./remove_tags_and_clean.py ./extracted_articles ./wikipedia_corpus.txt
 
 cd $DATA_DIR
 # Create HDF5 files for SMALL_WIKI
-bash create_datasets_from_start.sh ${WIKI_DIR} ./${WIKI_DIR}/wikipedia_corpus.txt \
-  && rm -r ./${WIKI_DIR}/final_* \
+bash create_datasets_from_start.sh ${WIKI_DIR} ./${WIKI_DIR}/wikipedia_corpus.txt

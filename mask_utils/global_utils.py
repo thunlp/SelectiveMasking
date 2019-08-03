@@ -1,5 +1,25 @@
+import os
+import re
 import numpy as np
 from tqdm import tqdm
+
+def zero_digits(s):
+    """
+    Replace every digit in a string by a zero.
+    """
+    return re.sub('\d', '0', s)
+
+def load_bert_sentences(bert_data_dir, zeros):
+    files = os.listdir(bert_data_dir)
+    all_sentences = []
+    for file in files:
+        f = open(os.path.join(bert_data_dir, file))
+        sentences = f.readlines()
+        # line = zero_digits(line.rstrip()) if zeros else line.rstrip()
+        sentences = [(zero_digits(s.strip()) if zeros else s.strip()).split(" ") for s in sentences]
+        all_sentences.extend(sentences)
+        f.close()
+    return all_sentences
 
 
 def display_diff(s, new_s, mask_pos):

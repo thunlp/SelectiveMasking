@@ -29,7 +29,7 @@ import tokenization as tokenization
 
 import random
 import collections
-import mask_utils.mask_generators
+import mask_utils.mask_generators as mask_generators
 
 class A:
     def __init__(self):
