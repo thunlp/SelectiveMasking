@@ -3,6 +3,25 @@ import re
 import numpy as np
 from tqdm import tqdm
 
+
+def cap_feature(s):
+    """
+    Capitalization feature:
+    0 = low caps
+    1 = all caps
+    2 = first letter caps
+    3 = one capital (not first letter)
+    """
+    if s.lower() == s:
+        return 0
+    elif s.upper() == s:
+        return 1
+    elif s[0].upper() == s[0]:
+        return 2
+    else:
+        return 3
+
+
 def zero_digits(s):
     """
     Replace every digit in a string by a zero.
@@ -31,7 +50,7 @@ def display_diff(s, new_s, mask_pos):
     print('\n')
 
 
-def data_mask(s, mask_num=0, mask_rate=0):
+def mask_sentence(s, mask_num=0, mask_rate=0):
     mask_pos_list = []
     length = len(s)
     rand_list = np.random.permutation(length)

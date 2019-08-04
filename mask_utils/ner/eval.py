@@ -1,14 +1,15 @@
 # coding=utf-8
 from __future__ import print_function
-import optparse
+import argparse
 import torch
 import time
 import pickle
 import os
-
+import sys
+sys.path.append("..")
 from torch.autograd import Variable
 from tqdm import tqdm
-from mask_utils import item_detail, result_diff, mask_result
+from global_utils import item_detail, result_diff, mask_result
 from loader import *
 from utils import *
 
@@ -17,59 +18,59 @@ t = time.time()
 
 # python -m visdom.server
 
-optparser = optparse.OptionParser()
-optparser.add_option(
+parser = argparse.ArgumentParser()
+parser.add_argument(
     "-t", "--test", default="dataset/eng.testb",
     help="Test set location"
 )
-optparser.add_option(
+parser.add_argument(
     '--score', default='evaluation/temp/score.txt',
     help='score file location'
 )
-optparser.add_option(
-    "-f", "--crf", default="0",
-    type='int', help="Use CRF (0 to disable)"
+parser.add_argument(
+    "-f", "--crf", action='store_true',
+    help="Use CRF (0 to disable)"
 )
-optparser.add_option(
-    "-g", '--use_gpu', default='1',
-    type='int', help='whether or not to ues gpu'
+parser.add_argument(
+    "-g", '--use_gpu', action='store_true',
+    help='whether or not to ues gpu'
 )
-optparser.add_option(
+parser.add_argument(
     '--loss', default='loss.txt',
     help='loss file location'
 )
-optparser.add_option(
+parser.add_argument(
     '--model_path', default='models/lstm_crf.model',
     help='model path'
 )
-optparser.add_option(
+parser.add_argument(
     '--map_path', default='models/mapping.pkl',
     help='model path'
 )
-optparser.add_option(
+parser.add_argument(
     '--char_mode', choices=['CNN', 'LSTM'], default='CNN',
     help='char_CNN or char_LSTM'
 )
-optparser.add_option(
+parser.add_argument(
     '--mask_rate', default=0, type=float,
     help='random mask data rate'
 )
-optparser.add_option(
+parser.add_argument(
     '--mask_num', default=0, type=int,
     help='random mask data number'
 )
-optparser.add_option(
+parser.add_argument(
     '--mask_samp', default=1, type=int,
     help="random mask sample number"
 )
-optparser.add_option(
+parser.add_argument(
     '--display_detail', action='store_true',
     help='wether display detail of mask'
 )
 
-opts = optparser.parse_args()[0]
+args = parser.parse_args()
 
-mapping_file = opts.map_path
+mapping_file = args.map_path
 
 with open(mapping_file, 'rb') as f:
     mappings = pickle.load(f)
@@ -78,35 +79,35 @@ word_to_id = mappings['word_to_id']
 tag_to_id = mappings['tag_to_id']
 id_to_tag = {k[1]: k[0] for k in tag_to_id.items()}
 char_to_id = mappings['char_to_id']
-parameters = mappings['parameters']
+config = mappings['args']
 word_embeds = mappings['word_embeds']
 
-use_gpu = opts.use_gpu == 1 and torch.cuda.is_available()
+# use_gpu = args.use_gpu == 1 and torch.cuda.is_available()
 
 
-assert os.path.isfile(opts.test)
-assert parameters['tag_scheme'] in ['iob', 'iobes']
+assert os.path.isfile(args.test)
+assert config.tag_scheme in ['iob', 'iobes']
 
 if not os.path.isfile(eval_script):
     raise Exception('CoNLL evaluation script not found at "%s"' % eval_script)
 if not os.path.exists(eval_temp):
     os.makedirs(eval_temp)
 
-lower = parameters['lower']
-zeros = parameters['zeros']
-tag_scheme = parameters['tag_scheme']
+lower = config.lower
+zeros = config.zeros
+tag_scheme = config.tag_scheme
 # mask_rate = parameters['mask_rate']
 
-test_sentences = load_sentences(opts.test, lower, zeros)
+test_sentences = load_sentences(args.test, lower, zeros)
 update_tag_scheme(test_sentences, tag_scheme)
 test_data, all_masked_test_data = prepare_dataset(
-    test_sentences, word_to_id, char_to_id, tag_to_id, lower, opts.mask_num, opts.mask_rate, opts.mask_samp
+    test_sentences, word_to_id, char_to_id, tag_to_id, lower, args.mask_num, args.mask_rate, args.mask_samp
 )
 
-model = torch.load(opts.model_path)
-model_name = opts.model_path.split('/')[-1].split('.')[0]
+model = torch.load(args.model_path)
+model_name = args.model_path.split('/')[-1].split('.')[0]
 
-if use_gpu:
+if args.use_gpu:
     model.cuda()
 model.eval()
 
@@ -121,7 +122,7 @@ def evaluate(model, datas, postfix=''):
         chars2 = data['chars']
         caps = data['caps']
 
-        if parameters['char_mode'] == 'LSTM':
+        if config.char_mode == 'LSTM':
             chars2_sorted = sorted(chars2, key=lambda p: len(p), reverse=True)
             d = {}
             for i, ci in enumerate(chars2):
@@ -137,7 +138,7 @@ def evaluate(model, datas, postfix=''):
                 chars2_mask[i, :chars2_length[i]] = c
             chars2_mask = Variable(torch.LongTensor(chars2_mask))
 
-        if parameters['char_mode'] == 'CNN':
+        if config.char_mode == 'CNN':
             d = {}
             chars2_length = [len(c) for c in chars2]
             char_maxl = max(chars2_length)
@@ -149,7 +150,7 @@ def evaluate(model, datas, postfix=''):
 
         dwords = torch.LongTensor(data['words'])
         dcaps = torch.LongTensor(caps)
-        if use_gpu:
+        if args.use_gpu:
             val, out = model(dwords.cuda(), chars2_mask.cuda(),
                              dcaps.cuda(), chars2_length, d)
         else:
@@ -192,10 +193,10 @@ def evaluate(model, datas, postfix=''):
 
 
 param = {"origin_param": {}, "mask_param": {
-    "postfix": str(opts.mask_rate) + '_' + str(opts.mask_num)}}
+    "postfix": str(args.mask_rate) + '_' + str(args.mask_num)}}
 
-mask_result(opts.mask_samp, opts.mask_num, opts.mask_rate,
-            opts.display_detail, evaluate, model, test_data, all_masked_test_data, param)
+mask_result(args.mask_samp, args.mask_num, args.mask_rate,
+            args.display_detail, evaluate, model, test_data, all_masked_test_data, param)
 
 
 print("Evaluation time: {}".format(time.time() - t))

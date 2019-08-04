@@ -2,7 +2,6 @@
 from __future__ import print_function
 import argparse
 import itertools
-import loader
 import torch
 import time
 import sys
@@ -11,14 +10,13 @@ import matplotlib.pyplot as plt
 
 from collections import OrderedDict
 from torch.autograd import Variable
-sys.path.append("..")
-from global_utils import load_bert_sentences
 # import visdom
-from utils import *
-from loader import *
-from model import BiLSTM_CRF
+from mask_utils.global_utils import load_bert_sentences
+from mask_utils.ner.loader import *
+from mask_utils.ner.utils import *
+from mask_utils.ner.model import BiLSTM_CRF
 t = time.time()
-models_path = "models/"
+models_path = "mask_utils/ner/models/"
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -123,7 +121,7 @@ args = parser.parse_args()
 
 use_gpu = args.use_gpu == 1 and torch.cuda.is_available()
 
-mapping_file = 'models/mapping.pkl'
+mapping_file = 'mask_utils/ner/models/mapping.pkl'
 
 name = args.name
 model_name = models_path + name #get_name(parameters)
@@ -152,9 +150,9 @@ zeros = args.zeros
 tag_scheme = args.tag_scheme
 
 # Load sentences
-train_sentences = loader.load_sentences(args.train, lower, zeros)
-dev_sentences = loader.load_sentences(args.dev, lower, zeros)
-test_sentences = loader.load_sentences(args.test, lower, zeros)
+train_sentences = load_sentences(args.train, lower, zeros)
+dev_sentences = load_sentences(args.dev, lower, zeros)
+test_sentences = load_sentences(args.test, lower, zeros)
 bert_sentences = load_bert_sentences(args.bert_data_dir, zeros)
 
 # Extract raw sentences
@@ -227,7 +225,11 @@ with open(mapping_file, 'wb') as f:
         'tag_to_id': tag_to_id,
         'char_to_id': char_to_id,
         'args': args,
-        'word_embeds': word_embeds
+        'word_embeds': word_embeds,
+        'embedding_dim': args.word_dim,
+        'hidden_dim': args.word_lstm_dim,
+        'use_crf': args.crf,
+        'char_mode': args.char_mode
     }
     pickle.dump(mappings, f)
 print("mapping file generate succeed")
@@ -414,7 +416,7 @@ for epoch in range(1, 10001):
             # best_train_F, new_train_F, _ = evaluating(model, test_train_data, best_train_F)
             best_dev_F, new_dev_F, save = evaluating(model, dev_data, best_dev_F)
             if save:
-                torch.save(model, model_name)
+                torch.save(model.state_dict(), model_name)
             # best_test_F, new_test_F, _ = evaluating(model, test_data, best_test_F)
             sys.stdout.flush()
 

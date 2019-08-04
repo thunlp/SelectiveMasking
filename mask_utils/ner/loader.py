@@ -4,15 +4,15 @@ import os
 import re
 import codecs
 import unicodedata
-from utils import create_dico, create_mapping, zero_digits
-from utils import iob2, iob_iobes
-sys.path.append("..")
-from global_utils import display_diff, data_mask, load_bert_sentences
-import model as model
+from .utils import create_dico, create_mapping, zero_digits
+from .utils import iob2, iob_iobes
+from . import model
 import string
 import random
 import numpy as np
 
+sys.path.append("..")
+from mask_utils.global_utils import display_diff, mask_sentence, load_bert_sentences
 
 def unicodeToAscii(s):
     return ''.join(
@@ -204,6 +204,42 @@ def prepare_sentence(str_words, word_to_id, char_to_id, lower=False):
         'caps': caps
     }
 
+def prepare_data(tokens, word_to_id, char_to_id, tag_to_id, lower=True, mask_num=0, mask_rate=0, mask_samp=0):
+    def f(x): return x.lower() if lower else x
+    words = [word_to_id[f(w) if f(w) in word_to_id else '<UNK>'] for w in tokens]
+    # Skip characters that are not in the training set
+    chars = [[char_to_id[c] for c in w if c in char_to_id] for w in tokens]
+    caps = [cap_feature(w) for w in tokens]
+    data = {
+        'str_words': tokens,
+        'words': words,
+        'chars': chars,
+        'caps': caps,
+    }
+
+    # masked data
+    masked_data = []
+    for samp in range(mask_samp):
+        masked_data, masked_poses = [], []
+        new_s, mask_pos = mask_sentence(tokens, mask_num, mask_rate)
+        # display_diff(s, new_s, mask_pos)
+        words = [word_to_id[f(w) if f(w) in word_to_id else '<UNK>'] for w in tokens]
+        # Skip characters that are not in the training set
+        chars = [[char_to_id[c] for c in w if c in char_to_id] for w in tokens]
+        caps = [cap_feature(w) for w in tokens]
+        tags = [tag_to_id[w[-1]] for w in new_s]
+        masked_data.append({
+        'data': {
+            'str_words': tokens,
+            'words': words,
+            'chars': chars,
+            'caps': caps,
+        },
+        'pos': mask_pos
+        })
+
+    return data, masked_data
+
 
 def prepare_dataset(sentences, word_to_id, char_to_id, tag_to_id, lower=True, mask_num=0, mask_rate=0, mask_samp=0):
     """
@@ -220,8 +256,7 @@ def prepare_dataset(sentences, word_to_id, char_to_id, tag_to_id, lower=True, ma
         words = [word_to_id[f(w) if f(w) in word_to_id else '<UNK>']
                  for w in str_words]
         # Skip characters that are not in the training set
-        chars = [[char_to_id[c] for c in w if c in char_to_id]
-                 for w in str_words]
+        chars = [[char_to_id[c] for c in w if c in char_to_id] for w in str_words]
         caps = [cap_feature(w) for w in str_words]
         tags = [tag_to_id[w[-1]] for w in s]
         data.append({
@@ -237,7 +272,7 @@ def prepare_dataset(sentences, word_to_id, char_to_id, tag_to_id, lower=True, ma
     for samp in range(mask_samp):
         masked_data, masked_poses = [], []
         for s in sentences:
-            new_s, mask_pos = data_mask(s, mask_num, mask_rate)
+            new_s, mask_pos = mask_sentence(s, mask_num, mask_rate)
             # display_diff(s, new_s, mask_pos)
             str_words = [w[0] for w in new_s]
             words = [word_to_id[f(w) if f(w) in word_to_id else '<UNK>']
@@ -256,6 +291,7 @@ def prepare_dataset(sentences, word_to_id, char_to_id, tag_to_id, lower=True, ma
             })
             masked_poses.append(mask_pos)
         all_masked_data.append({'data': masked_data, 'pos': masked_poses})
+    
     return data, all_masked_data
 
 

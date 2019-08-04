@@ -1,7 +1,7 @@
 import torch
 import torch.autograd as autograd
 from torch.autograd import Variable
-from utils import *
+from .utils import *
 
 START_TAG = '<START>'
 STOP_TAG = '<STOP>'
@@ -31,9 +31,8 @@ def log_sum_exp(vec):
 
 
 class BiLSTM_CRF(nn.Module):
-
-    def __init__(self, vocab_size, tag_to_ix, embedding_dim, hidden_dim, char_lstm_dim=25,
-                 char_to_ix=None, pre_word_embeds=None, char_embedding_dim=25, use_gpu=False,
+    def __init__(self, vocab_size = 0, tag_to_ix = {START_TAG: 0, STOP_TAG: 1}, embedding_dim = 100, hidden_dim = 100, char_lstm_dim=25,
+                 char_to_ix={}, pre_word_embeds=None, char_embedding_dim=25, use_gpu=False,
                  n_cap=None, cap_embedding_dim=None, use_crf=True, char_mode='CNN'):
         super(BiLSTM_CRF, self).__init__()
         self.use_gpu = use_gpu
