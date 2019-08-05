@@ -1,0 +1,10 @@
+{
+    "Ner": {
+        "mask_samp": 10,
+        "mask_num": 2,
+        "mask_rate": 0.0,
+        "model_path": "/home/gyx/nvidia-bert/mask_utils/ner/models/test_bert_dim.model",
+        "mapping_file": "/home/gyx/nvidia-bert/mask_utils/ner/models/mapping.pkl",
+        "gpu": 1
+    }
+}

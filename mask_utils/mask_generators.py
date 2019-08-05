@@ -113,7 +113,11 @@ class Ner(MaskGenerator):
         # assume char mode is LSTM
         d = {}
         chars2_length = [len(c) for c in chars2]
-        char_maxl = max(chars2_length)
+        try:
+            char_maxl = max(chars2_length)
+        except ValueError:
+            print(data)
+            raise ValueError
         chars2_mask = np.zeros(
             (len(chars2_length), char_maxl), dtype='int')
         for i, c in enumerate(chars2):
@@ -132,11 +136,17 @@ class Ner(MaskGenerator):
         return pred_result
 
     def generate_mask(self, data, masked_datas):
-        prediction = self.evaluate(data)
+        try:
+            prediction = self.evaluate(data)
+        except ValueError:
+            print("OOOO")
         pos_signi = [0 for w in data['words']]
         for masked_data in masked_datas:
             # print(masked_data['pos'])
-            masked_prediction = self.evaluate(masked_data['data'])
+            try:
+                masked_prediction = self.evaluate(masked_data['data'])
+            except ValueError:
+                print(masked_datas)
             diff_words_num = 0
             # print(prediction)
             # print(masked_prediction)
@@ -155,8 +165,8 @@ class Ner(MaskGenerator):
         signi_indexes = tuple(zip(*sorted(zip_list, key=lambda x: x[1], reverse=True)))[0]
         return signi_indexes
 
-    def forward(self, tokens):
-        data, masked_datas = self.prepare_data(tokens)
+    def forward(self, line):
+        data, masked_datas = self.prepare_data(line.strip().split())
         # print(data, masked_datas)
         signi_indexes = self.generate_mask(data, masked_datas)
         return signi_indexes

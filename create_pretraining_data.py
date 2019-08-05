@@ -23,6 +23,7 @@ from io import open
 import h5py
 import numpy as np
 from tqdm import tqdm, trange
+import json
 
 from tokenization import BertTokenizer
 import tokenization as tokenization
@@ -165,7 +166,7 @@ def create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked
         for index in signi_indexes:
             cand_indexes.append([index])
             i = index + 1
-            while valid_positions[i] == 0:
+            while i < len(valid_positions) and valid_positions[i] == 0:
                 cand_indexes[-1].append(i)
                 i += 1
     else:
@@ -220,7 +221,7 @@ def create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked
 
     return masked_info
 
-def create_training_instances(input_files, task_name, tokenizer, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
+def create_training_instances(input_files, task_name, generator, tokenizer, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
     """Create `TrainingInstance`s from raw text."""
     all_documents = [[]]
     vocab_words = list(tokenizer.vocab.keys())
@@ -234,21 +235,21 @@ def create_training_instances(input_files, task_name, tokenizer, max_seq_length,
     for input_file in input_files:
         print("creating instance from {}".format(input_file))
         with open(input_file, "r") as reader:
-            while True:
-                line = tokenization.convert_to_unicode(reader.readline())
-                if not line:
-                    break
+            lines = reader.readlines()
+            i = 0
+            for line in tqdm(lines, desc="Processing"):
+                line = tokenization.convert_to_unicode(line)
                 line = line.strip()
 
                 # Empty lines are used as document delimiters
                 if not line:
                     all_documents.append([])
+                    continue
 
                 # tokenize
                 # tokens = tokenizer.tokenize(line)
                 signi_indexes = []
                 if task_name:
-                    generator = getattr(mask_generators, task_name)
                     signi_indexes = generator(line)
                 tokens, valid_positions = tokenize(tokenizer, line)
                 m_info = create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked_lm_prob, max_predictions_per_seq / max_seq_length, vocab_words, rng)
@@ -519,6 +520,11 @@ def main():
                         required=False,
                         help="Use specific task to generate better mask. If does not specify a task, "
                                 "mask will be randomly chose as original version")
+    parser.add_argument("--downstream_config", 
+                        default="",
+                        type=str,
+                        required=False,
+                        help="Downstream model configure json file")
     # int 
     parser.add_argument("--max_seq_length",
                         default=128,
@@ -571,10 +577,13 @@ def main():
         raise ValueError("{} is not a valid path".format(args.input_file))
 
     print(args)
-
+    generator = None
+    if args.task_name:
+        downstream_config = json.load(open(args.downstream_config))[args.task_name]
+        generator = getattr(mask_generators, args.task_name)(downstream_config)
     rng = random.Random(args.random_seed)
     instances = create_training_instances(
-        input_files, args.task_name, tokenizer, args.max_seq_length, args.dupe_factor,
+        input_files, args.task_name, generator, tokenizer, args.max_seq_length, args.dupe_factor,
         args.short_seq_prob, args.masked_lm_prob, args.max_predictions_per_seq,
         rng)
 

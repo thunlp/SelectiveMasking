@@ -12,6 +12,6 @@ config = {
 
 ner = Ner(config)
 f = open("data/small_wiki_5m_base/final_text_files_sharded/corpus.segmented.part.0.txt", "r")
-lines = [line.strip().split(" ") for line in f.readlines()]
+lines = f.readlines()
 for i, line in enumerate(lines):
     print(i, ner(line))
