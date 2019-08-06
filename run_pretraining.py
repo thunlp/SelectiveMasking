@@ -357,7 +357,7 @@ def main():
                         scaled_loss.backward()
                 else:
                     loss.backward()
-                tr_loss += loss
+                tr_loss += loss.item()
                 average_loss += loss.item()
 
                 if training_steps % args.gradient_accumulation_steps == 0:
