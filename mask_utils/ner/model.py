@@ -47,8 +47,8 @@ class BiLSTM_CRF(nn.Module):
         self.out_channels = char_lstm_dim
         self.char_mode = char_mode
 
-        print('char_mode: %s, out_channels: %d, hidden_dim: %d, ' %
-              (char_mode, char_lstm_dim, hidden_dim))
+        # print('char_mode: %s, out_channels: %d, hidden_dim: %d, ' %
+            #   (char_mode, char_lstm_dim, hidden_dim))
 
         if self.n_cap and self.cap_embedding_dim:
             self.cap_embeds = nn.Embedding(self.n_cap, self.cap_embedding_dim)
@@ -100,12 +100,13 @@ class BiLSTM_CRF(nn.Module):
         init_linear(self.hidden2tag)
         init_linear(self.hw_gate)
         init_linear(self.hw_trans)
-
+        # print(self.use_gpu)
         if self.use_crf:
             self.transitions = nn.Parameter(
                 torch.zeros(self.tagset_size, self.tagset_size))
             self.transitions.data[tag_to_ix[START_TAG], :] = -10000
             self.transitions.data[:, tag_to_ix[STOP_TAG]] = -10000
+        # print(self.use_gpu)
 
     def _score_sentence(self, feats, tags):
         # tags is ground_truth, a list of ints, length is len(sentence)

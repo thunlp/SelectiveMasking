@@ -31,7 +31,7 @@ def zero_digits(s):
 def load_bert_sentences(bert_data_dir, zeros):
     files = os.listdir(bert_data_dir)
     all_sentences = []
-    for file in files:
+    for file in tqdm(files):
         f = open(os.path.join(bert_data_dir, file))
         sentences = f.readlines()
         # line = zero_digits(line.rstrip()) if zeros else line.rstrip()

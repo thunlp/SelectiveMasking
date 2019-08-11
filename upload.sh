@@ -1,1 +1,1 @@
-rsync -avzp ./* newnlp:~/nvidia-bert
+rsync -avzp ./* newnlp2:~/nvidia-bert

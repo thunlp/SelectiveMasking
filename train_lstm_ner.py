@@ -20,19 +20,19 @@ models_path = "mask_utils/ner/models/"
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "-T", "--train", default="dataset/eng.train",
+    "-T", "--train", default="data/CoNll/train.txt",
     help="Train set location"
 )
 parser.add_argument(
-    "-d", "--dev", default="dataset/eng.testa",
+    "-d", "--dev", default="data/CoNll/valid.txt",
     help="Dev set location"
 )
 parser.add_argument(
-    "-t", "--test", default="dataset/eng.testb",
+    "-t", "--test", default="data/CoNll/test.txt",
     help="Test set location"
 )
 parser.add_argument(
-    '--score', default='evaluation/temp/score.txt',
+    '--score', default='mask_utils/ner/evaluation/temp/score.txt',
     help='score file location'
 )
 parser.add_argument(
@@ -64,7 +64,7 @@ parser.add_argument(
     help="Token embedding dimension"
 )
 parser.add_argument(
-    "-W", "--word_lstm_dim", type=int, default=200,
+    "-W", "--word_lstm_dim", type=int, default=100,
     help="Token LSTM hidden layer size"
 )
 parser.add_argument(
@@ -72,7 +72,7 @@ parser.add_argument(
     help="Use a bidirectional LSTM for words"
 )
 parser.add_argument(
-    "-p", "--pre_emb", default="",
+    "-p", "--pre_emb", default="data/pre_embeddings/glove.6B.100d.txt",
     help="Location of pretrained embeddings"
 )
 # parser.add_argument(
@@ -104,7 +104,7 @@ parser.add_argument(
     help='loss file location'
 )
 parser.add_argument(
-    '--name', default='test',
+    '--name', default='test_bert_1g.model',
     help='model name'
 )
 parser.add_argument(
@@ -112,7 +112,7 @@ parser.add_argument(
     help='char_CNN or char_LSTM'
 )
 parser.add_argument(
-    '--bert_data_dir', default=''
+    '--bert_data_dir', default='data/small_wiki_1g/final_text_files_sharded/'
 )
 # parser.add_argument(
     # '--mapping_file', default='models/mapping.pkl'
@@ -153,6 +153,7 @@ tag_scheme = args.tag_scheme
 train_sentences = load_sentences(args.train, lower, zeros)
 dev_sentences = load_sentences(args.dev, lower, zeros)
 test_sentences = load_sentences(args.test, lower, zeros)
+print("loading bert sentences")
 bert_sentences = load_bert_sentences(args.bert_data_dir, zeros)
 
 # Extract raw sentences

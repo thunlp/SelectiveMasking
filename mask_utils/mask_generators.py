@@ -57,11 +57,14 @@ class Ner(MaskGenerator):
                                 pre_word_embeds=self.word_embeds,
                                 use_crf=self.use_crf,
                                 char_mode=self.char_mode)
-        self.model.load_state_dict(torch.load(config["model_path"]))
-        self.model.eval()
+        # print(self.gpu)
         if self.gpu:
+            self.model.load_state_dict(torch.load(config["model_path"]))
             self.model.cuda()
+        else:
+            self.model.load_state_dict(torch.load(config["model_path"], map_location='cpu'))
 
+        self.model.eval()
 
     def load_mapping(self, mapping_file):
         with open(mapping_file, 'rb') as f:

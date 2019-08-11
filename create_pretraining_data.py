@@ -15,6 +15,7 @@
 """Create masked LM/next sentence masked_lm TF examples for BERT."""
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import torch
 import argparse
 import logging
 import os
@@ -181,7 +182,7 @@ def create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked
     # NOTE changed to len(cand_indexes) * masked_lm_prob
     num_to_predict = min(max_predictions_sub_seq, max(1, int(round(len(cand_indexes) * masked_lm_prob))))
 
-    masked_info = ["" for token in tokens] # if masked, masked symbol, else ""
+    masked_info = [{} for token in tokens] # if masked, masked symbol, else ""
     masked_lms_len = 0
     # covered_indexes = set()
     for indexes in cand_indexes:
@@ -204,7 +205,10 @@ def create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked
                 masked_tokens = [vocab_words[rng.randint(0, len(vocab_words) - 1)] for index in indexes]
 
         for (i, index) in enumerate(indexes):
-            masked_info[index] = masked_tokens[i]
+            masked_info[index]["mask"] = masked_tokens[i]
+            masked_info[index]["label"] = tokens[index]
+
+        masked_lms_len += len(indexes)
 
         # masked_lms.extend([MaskedLmInstance(index=index, label=tokens[index]) for index in indexes])
 
@@ -240,6 +244,7 @@ def create_training_instances(input_files, task_name, generator, tokenizer, max_
 
                 # Empty lines are used as document delimiters
                 if not line:
+                    i += 1
                     all_documents.append([])
                     continue
 
@@ -247,7 +252,11 @@ def create_training_instances(input_files, task_name, generator, tokenizer, max_
                 # tokens = tokenizer.tokenize(line)
                 signi_indexes = []
                 if task_name:
-                    signi_indexes = generator(line)
+                    try:
+                        signi_indexes = generator(line)
+                    except RuntimeError:
+                        continue
+
                 tokens, valid_positions = tokenize(tokenizer, line)
                 m_info = create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked_lm_prob, max_predictions_per_seq / max_seq_length, vocab_words, rng)
                 if tokens:
@@ -255,7 +264,7 @@ def create_training_instances(input_files, task_name, generator, tokenizer, max_
 
     # Remove empty documents
     all_documents = [x for x in all_documents if x]
-    rng.shuffle(all_documents)
+    # rng.shuffle(all_documents)
 
     instances = []
     for _ in range(dupe_factor):
@@ -286,8 +295,8 @@ def create_instances_from_document(
     # The `target_seq_length` is just a rough target however, whereas
     # `max_seq_length` is a hard limit.
     target_seq_length = max_num_tokens
-    # if rng.random() < short_seq_prob:
-        # target_seq_length = rng.randint(2, max_num_tokens)
+    if rng.random() < short_seq_prob:
+        target_seq_length = rng.randint(2, max_num_tokens)
 
     # We DON'T just concatenate all of the tokens from a document into a long
     # sequence and choose an arbitrary split point because this would make the
@@ -361,7 +370,7 @@ def create_instances_from_document(
                 m_info = []
                 segment_ids = []
                 tokens.append("[CLS]")
-                m_info.append("")
+                m_info.append({})
                 segment_ids.append(0)
                 for token, info in zip(tokens_a, m_info_a):
                     tokens.append(token)
@@ -369,7 +378,7 @@ def create_instances_from_document(
                     segment_ids.append(0)
 
                 tokens.append("[SEP]")
-                m_info.append("")
+                m_info.append({})
                 segment_ids.append(0)
 
                 # for token, info in zip(tokens_b, m_info_b):
@@ -385,12 +394,15 @@ def create_instances_from_document(
                     rng.shuffle(masked_lm_positions)
                     masked_lm_positions = masked_lm_positions[0:max_predictions_per_seq]
                     masked_lm_positions.sort()
-                masked_lm_labels = [m_info[pos] for pos in masked_lm_positions]
+                # masks = [m_info[pos]["mask"] for pos in masked_lm_positions]
+                masked_lm_labels = [m_info[pos]["label"] for pos in masked_lm_positions]
                 
-                for (pos, label) in zip(masked_lm_positions, masked_lm_labels):
-                    tokens[pos] = label                   
-                
+                for pos in masked_lm_positions:
+                    tokens[pos] = m_info[pos]["mask"]
 
+                # for (pos, label) in zip(masked_lm_positions, masks):
+                    # tokens[pos] = label                   
+                
                 # (tokens, masked_lm_positions, masked_lm_labels) = create_masked_lm_predictions(
                     #  tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng)
                 is_random_next = False
@@ -403,9 +415,8 @@ def create_instances_from_document(
                 instances.append(instance)
                 # print(tokens, masked_lm_positions, masked_lm_labels)
             current_chunk = []
-            current_length = 0
+            current_length = 0  
         i += 1
-
     return instances
 
 
@@ -461,7 +472,6 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
     for p in masked_lms:
         masked_lm_positions.append(p.index)
         masked_lm_labels.append(p.label)
-
     return (output_tokens, masked_lm_positions, masked_lm_labels)
 
 def truncate_seq_pair(tokens_a, m_info_a, tokens_b, m_info_b, max_num_tokens, rng):
@@ -493,12 +503,16 @@ def main():
                         type=str,
                         required=True,
                         help="The vocabulary the BERT model will train on.")
-    parser.add_argument("--input_file",
+    parser.add_argument("--input_dir",
                         default=None,
                         type=str,
                         required=True,
                         help="The input train corpus. can be directory with .txt files or a path to a single file")
-    parser.add_argument("--output_file",
+    parser.add_argument("--input_prefix",
+                        default=None,
+                        type=str,
+                        )
+    parser.add_argument("--output_dir",
                         default=None,
                         type=str,
                         required=True,
@@ -524,6 +538,13 @@ def main():
                         type=str,
                         required=False,
                         help="Downstream model configure json file")
+    parser.add_argument("--gpus", 
+                        default=0,
+                        type=int)
+    parser.add_argument("--local_rank",
+                        default=0,
+                        type=int)
+
     # int 
     parser.add_argument("--max_seq_length",
                         default=128,
@@ -566,31 +587,40 @@ def main():
 
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
 
-    
-    input_files = []
-    if os.path.isfile(args.input_file):
-        input_files.append(args.input_file)
-    elif os.path.isdir(args.input_file):
-        input_files = [os.path.join(args.input_file, f) for f in os.listdir(args.input_file) if (os.path.isfile(os.path.join(args.input_file, f)) and f.endswith('.txt'))]
-    else:
-        raise ValueError("{} is not a valid path".format(args.input_file))
-
-    print(args)
     generator = None
     if args.task_name:
-        downstream_config = json.load(open(args.downstream_config))[args.task_name]
+        downstream_config = json.load(open(args.downstream_config))[
+            args.task_name]
         generator = getattr(mask_generators, args.task_name)(downstream_config)
     rng = random.Random(args.random_seed)
-    instances = create_training_instances(
-        input_files, args.task_name, generator, tokenizer, args.max_seq_length, args.dupe_factor,
-        args.short_seq_prob, args.masked_lm_prob, args.max_predictions_per_seq,
-        rng)
 
-    output_file = args.output_file
-
-
-    write_instance_to_example_file(instances, tokenizer, args.max_seq_length,
-                                    args.max_predictions_per_seq, output_file)
+    # input_files = []
+    rank = args.local_rank
+    filename = os.path.join(args.input_dir, args.input_prefix + str(rank) + ".txt")
+    k = 0
+    while os.path.isfile(filename):
+        input_files = [filename]
+        
+        # if os.path.isfile(args.input_file):
+        # input_files.append(args.input_file)
+        # elif os.path.isdir(args.input_file):
+        # input_files = [os.path.join(args.input_file, f) for f in os.listdir(args.input_file) if (os.path.isfile(os.path.join(args.input_file, f)) and f.endswith('.txt'))]
+        # else:
+        # raise ValueError("{} is not a valid path".format(args.input_file))
+        
+        # print(args)
+        # torch.cuda.set_device(args.local_rank)
+        instances = create_training_instances(
+            input_files, args.task_name, generator, tokenizer, args.max_seq_length, args.dupe_factor,
+            args.short_seq_prob, args.masked_lm_prob, args.max_predictions_per_seq,
+            rng)
+            
+        output_file = os.path.join(args.output_dir, str(rank) + ".hdf5")        
+        write_instance_to_example_file(instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, output_file)
+        
+        rank += args.gpus
+        k += 1
+        filename = os.path.join(args.input_dir, args.input_prefix + str(rank) + ".txt")
 
 
 if __name__ == "__main__":

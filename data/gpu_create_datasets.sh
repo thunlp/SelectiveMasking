@@ -21,19 +21,18 @@ else
 fi
 
 # Split articles into one-sentence-per-line format for use with BERT scripts
-echo "Applying sentence segmentation to get one sentence per line"
-mkdir -p ${MERGED_DIR}/final_text_file_single
-python3 utils/sentence_segmentation_nltk.py $corpus_file ${MERGED_DIR}/final_text_file_single/corpus.segmented.nltk.txt
-
-## Shard finalized text so that it has a chance of fitting in memory when creating pretraining data into hdf5 (choose appropriate number of shards for distributed training)
-echo "Shard text files - size is approximate to prevent splitting an article across shards"
-mkdir -p ${MERGED_DIR}/final_text_files_sharded
-python3 utils/shard_text_input_file.py ${MERGED_DIR}/final_text_file_single/corpus.segmented.nltk.txt ${MERGED_DIR}/final_text_files_sharded/corpus.segmented.part.
+# echo "Applying sentence segmentation to get one sentence per line"
+# mkdir -p ${MERGED_DIR}/final_text_file_single
+# python3 utils/sentence_segmentation_nltk.py $corpus_file ${MERGED_DIR}/final_text_file_single/corpus.segmented.nltk.txt
+#  
+# # Shard finalized text so that it has a chance of fitting in memory when creating pretraining data into hdf5 (choose appropriate number of shards for distributed training)
+# echo "Shard text files - size is approximate to prevent splitting an article across shards"
+# mkdir -p ${MERGED_DIR}/final_text_files_sharded
+# python3 utils/shard_text_input_file.py ${MERGED_DIR}/final_text_file_single/corpus.segmented.nltk.txt ${MERGED_DIR}/final_text_files_sharded/corpus.segmented.part.
 
 # Convert sharded text files into hdf5 that are ready for BERT pretraining
 echo "Creating hdf5 for each text shard"
 mkdir -p ${MERGED_DIR}/hdf5_shards
 export TARGET_DIR=${MERGED_DIR}
 . utils/preprocessing_xargs_wrapper.sh ${N_PROCS_PREPROCESS}
-# chmod 755 utils/pp_origin.sh; . utils/pxw_origin.sh ${N_PROCS_PREPROCESS}
 
