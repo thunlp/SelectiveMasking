@@ -59,10 +59,10 @@ class Ner(MaskGenerator):
                                 char_mode=self.char_mode)
         # print(self.gpu)
         if self.gpu:
-            self.model.load_state_dict(torch.load(config["model_path"]))
+            self.model.load_state_dict(torch.load(config["model_path"], map_location="cuda"))
             self.model.cuda()
         else:
-            self.model.load_state_dict(torch.load(config["model_path"], map_location='cpu'))
+            self.model.load_state_dict(torch.load(config["model_path"], map_location="cpu"))
 
         self.model.eval()
 

@@ -16,7 +16,7 @@ seed=${12:-42}
 job_name=${13:-"job"}
 
 
-DATASET=wiki_train # change this for other datasets
+DATASET=small_wiki_1g # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
 BERT_CONFIG=bert_config/bert_base_config.json

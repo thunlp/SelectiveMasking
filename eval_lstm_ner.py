@@ -6,12 +6,11 @@ import time
 import pickle
 import os
 import sys
-sys.path.append("..")
 from torch.autograd import Variable
 from tqdm import tqdm
-from global_utils import item_detail, result_diff, mask_result
-from loader import *
-from utils import *
+from mask_utils.ner.loader import *
+from mask_utils.ner.utils import *
+from mask_utils.ner.model import BiLSTM_CRF
 
 
 t = time.time()
@@ -20,11 +19,11 @@ t = time.time()
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "-t", "--test", default="dataset/eng.testb",
+    "-t", "--test", default="data/CoNll/test.txt",
     help="Test set location"
 )
 parser.add_argument(
-    '--score', default='evaluation/temp/score.txt',
+    '--dir', default='',
     help='score file location'
 )
 parser.add_argument(
@@ -40,37 +39,20 @@ parser.add_argument(
     help='loss file location'
 )
 parser.add_argument(
-    '--model_path', default='models/lstm_crf.model',
-    help='model path'
-)
-parser.add_argument(
-    '--map_path', default='models/mapping.pkl',
-    help='model path'
-)
-parser.add_argument(
     '--char_mode', choices=['CNN', 'LSTM'], default='CNN',
     help='char_CNN or char_LSTM'
 )
 parser.add_argument(
-    '--mask_rate', default=0, type=float,
-    help='random mask data rate'
+    '--model_name', type=str
 )
 parser.add_argument(
-    '--mask_num', default=0, type=int,
-    help='random mask data number'
+    '--eval_script', default='mask_utils/ner/evaluation/conlleval'
 )
-parser.add_argument(
-    '--mask_samp', default=1, type=int,
-    help="random mask sample number"
-)
-parser.add_argument(
-    '--display_detail', action='store_true',
-    help='wether display detail of mask'
-)
+
 
 args = parser.parse_args()
 
-mapping_file = args.map_path
+mapping_file = os.path.join(args.dir, "mapping.pkl")
 
 with open(mapping_file, 'rb') as f:
     mappings = pickle.load(f)
@@ -82,16 +64,11 @@ char_to_id = mappings['char_to_id']
 config = mappings['args']
 word_embeds = mappings['word_embeds']
 
-# use_gpu = args.use_gpu == 1 and torch.cuda.is_available()
-
-
 assert os.path.isfile(args.test)
 assert config.tag_scheme in ['iob', 'iobes']
 
-if not os.path.isfile(eval_script):
+if not os.path.isfile(args.eval_script):
     raise Exception('CoNLL evaluation script not found at "%s"' % eval_script)
-if not os.path.exists(eval_temp):
-    os.makedirs(eval_temp)
 
 lower = config.lower
 zeros = config.zeros
@@ -100,23 +77,34 @@ tag_scheme = config.tag_scheme
 
 test_sentences = load_sentences(args.test, lower, zeros)
 update_tag_scheme(test_sentences, tag_scheme)
-test_data, all_masked_test_data = prepare_dataset(
-    test_sentences, word_to_id, char_to_id, tag_to_id, lower, args.mask_num, args.mask_rate, args.mask_samp
-)
+test_data = prepare_dataset(
+    test_sentences, word_to_id, char_to_id, tag_to_id, lower)
 
-model = torch.load(args.model_path)
-model_name = args.model_path.split('/')[-1].split('.')[0]
+model = BiLSTM_CRF(vocab_size=len(word_to_id),
+                    tag_to_ix=tag_to_id,
+                    embedding_dim=config.word_dim,
+                    hidden_dim=config.word_lstm_dim,
+                    use_gpu=args.use_gpu,
+                    char_to_ix=char_to_id,
+                    pre_word_embeds=word_embeds,
+                    use_crf=config.crf,
+                    char_mode=config.char_mode)
+
+model_path = os.path.join(args.dir, args.model_name)
 
 if args.use_gpu:
+    model.load_state_dict(torch.load(model_path, map_location="cuda"))
     model.cuda()
-model.eval()
-
+else:
+    model.load_state_dict(toch.load(model_path, map_location="cpu"))
+    model.cpu()
+model.eval() #NOTE very important
 
 def evaluate(model, datas, postfix=''):
     prediction = []
     confusion_matrix = torch.zeros((len(tag_to_id) - 2, len(tag_to_id) - 2))
     # print("OK")
-    for data in datas:
+    for data in tqdm(datas):
         ground_truth_id = data['tags']
         words = data['str_words']
         chars2 = data['chars']
@@ -156,47 +144,18 @@ def evaluate(model, datas, postfix=''):
         else:
             val, out = model(dwords, chars2_mask, dcaps, chars2_length, d)
         predicted_id = out
-        temp_pred = []
         for (word, true_id, pred_id) in zip(words, ground_truth_id, predicted_id):
-            # line = ' '.join([word, id_to_tag[true_id], id_to_tag[pred_id]])
-            # prediction.append(line)
-            temp_pred.append([word, id_to_tag[true_id], id_to_tag[pred_id]])
+            line = ' '.join([word, id_to_tag[true_id], id_to_tag[pred_id]])
+            prediction.append(line)
             confusion_matrix[true_id, pred_id] += 1
-        prediction.append(temp_pred)
-    predf = eval_temp + '/pred.' + model_name + '_' + postfix
-    scoref = eval_temp + '/score.' + model_name + '_' + postfix
-    # print(predf)
+        prediction.append('')
+    predf = os.path.join(args.dir, 'test_pred.' + args.model_name)
+    scoref = os.path.join(args.dir, 'test_score.' + args.model_name)
     with open(predf, 'w') as f:
-        for sen in prediction:
-            for word in sen:
-                f.write(' '.join(word) + '\n')
-            f.write('\n')
-        # f.write('\n'.join(prediction))
+        f.write('\n'.join(prediction))
 
-    os.system('%s < %s > %s' % (eval_script, predf, scoref))
-    return prediction
+    os.system('%s < %s > %s' % (args.eval_script, predf, scoref))
 
-    # with open(scoref, 'rb') as f:
-    #     for l in f.readlines():
-    #         print(l.strip())
-
-    # print(("{: >2}{: >7}{: >7}%s{: >9}" % ("{: >7}" * confusion_matrix.size(0))).format(
-    #     "ID", "NE", "Total",
-    #     *([id_to_tag[i] for i in range(confusion_matrix.size(0))] + ["Percent"])
-    # ))
-    # for i in range(confusion_matrix.size(0)):
-    #     print(("{: >2}{: >7}{: >7}%s{: >9}" % ("{: >7}" * confusion_matrix.size(0))).format(
-    #         str(i), id_to_tag[i], str(confusion_matrix[i].sum()),
-    #         *([confusion_matrix[i][j] for j in range(confusion_matrix.size(0))] +
-    #           ["%.3f" % (confusion_matrix[i][i] * 100. / max(1, confusion_matrix[i].sum()))])
-    #     ))
-
-
-param = {"origin_param": {}, "mask_param": {
-    "postfix": str(args.mask_rate) + '_' + str(args.mask_num)}}
-
-mask_result(args.mask_samp, args.mask_num, args.mask_rate,
-            args.display_detail, evaluate, model, test_data, all_masked_test_data, param)
-
+evaluate(model, test_data)
 
 print("Evaluation time: {}".format(time.time() - t))

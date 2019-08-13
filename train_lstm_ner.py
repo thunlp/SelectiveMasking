@@ -16,7 +16,7 @@ from mask_utils.ner.loader import *
 from mask_utils.ner.utils import *
 from mask_utils.ner.model import BiLSTM_CRF
 t = time.time()
-models_path = "mask_utils/ner/models/"
+# models_path = "mask_utils/ner/models/"
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -30,10 +30,6 @@ parser.add_argument(
 parser.add_argument(
     "-t", "--test", default="data/CoNll/test.txt",
     help="Test set location"
-)
-parser.add_argument(
-    '--score', default='mask_utils/ner/evaluation/temp/score.txt',
-    help='score file location'
 )
 parser.add_argument(
     "-s", "--tag_scheme", default="iobes",
@@ -75,10 +71,6 @@ parser.add_argument(
     "-p", "--pre_emb", default="data/pre_embeddings/glove.6B.100d.txt",
     help="Location of pretrained embeddings"
 )
-# parser.add_argument(
-    # "-A", "--all_emb", default="0",
-    # type='int', help="Load all embeddings"
-# )
 parser.add_argument(
     "-a", "--cap_dim", type=int, default=0,
     help="Capitalization feature dimension (0 to disable)"
@@ -92,7 +84,7 @@ parser.add_argument(
     help="Droupout on the input (0 = no dropout)"
 )
 parser.add_argument(
-    "-r", "--reload", action='store_true',
+    "-r", "--reload", type=str, default="",
     help="Reload the last saved model"
 )
 parser.add_argument(
@@ -104,8 +96,11 @@ parser.add_argument(
     help='loss file location'
 )
 parser.add_argument(
-    '--name', default='test_bert_1g.model',
+    '--model_name', default='test_bert_1g.model',
     help='model name'
+)
+parser.add_argument(
+    '--dir', default=''
 )
 parser.add_argument(
     '--char_mode', choices=['CNN', 'LSTM'], default='CNN',
@@ -114,6 +109,9 @@ parser.add_argument(
 parser.add_argument(
     '--bert_data_dir', default='data/small_wiki_1g/final_text_files_sharded/'
 )
+parser.add_argument(
+    '--eval_script', default='mask_utils/ner/evaluation/conlleval'
+)
 # parser.add_argument(
     # '--mapping_file', default='models/mapping.pkl'
 # )
@@ -121,11 +119,8 @@ args = parser.parse_args()
 
 use_gpu = args.use_gpu == 1 and torch.cuda.is_available()
 
-mapping_file = 'mask_utils/ner/models/mapping.pkl'
-
-name = args.name
-model_name = models_path + name #get_name(parameters)
-tmp_model = model_name + '.tmp'
+# mapping_file = 'mask_utils/ner/models/mapping.pkl'
+mapping_file = os.path.join(args.dir, "mapping.pkl")
 
 assert os.path.isfile(args.train)
 assert os.path.isfile(args.dev)
@@ -137,12 +132,8 @@ assert args.tag_scheme in ['iob', 'iobes']
 # assert not parameters['pre_emb'] or parameters['word_dim'] > 0
 # assert not parameters['pre_emb'] or os.path.isfile(parameters['pre_emb'])
 
-if not os.path.isfile(eval_script):
+if not os.path.isfile(args.eval_script):
     raise Exception('CoNLL evaluation script not found at "%s"' % eval_script)
-if not os.path.exists(eval_temp):
-    os.makedirs(eval_temp)
-if not os.path.exists(models_path):
-    os.makedirs(models_path)
 
 # Data parameters
 lower = args.lower
@@ -191,13 +182,13 @@ dico_chars, char_to_id, id_to_char = char_mapping(train_sentences)
 dico_tags, tag_to_id, id_to_tag = tag_mapping(train_sentences)
 
 # Index data
-train_data, _ = prepare_dataset(
+train_data = prepare_dataset(
     train_sentences, word_to_id, char_to_id, tag_to_id, lower
 )
-dev_data, _ = prepare_dataset(
+dev_data = prepare_dataset(
     dev_sentences, word_to_id, char_to_id, tag_to_id, lower
 )
-test_data, _ = prepare_dataset(
+test_data = prepare_dataset(
     test_sentences, word_to_id, char_to_id, tag_to_id, lower
 )
 
@@ -246,10 +237,12 @@ model = BiLSTM_CRF(vocab_size=len(word_to_id),
                    char_mode=args.char_mode)
                    # n_cap=4,
                    # cap_embedding_dim=10)
+
 if args.reload:
-    model.load_state_dict(torch.load(model_name))
+    model.load_state_dict(torch.load(args.reload))
 if use_gpu:
     model.cuda()
+
 learning_rate = 0.015
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
 losses = []
@@ -265,7 +258,7 @@ count = 0
 sys.stdout.flush()
 
 
-def evaluating(model, datas, best_F):
+def evaluating(model, datas, best_F, postfix=""):
     prediction = []
     save = False
     new_F = 0.0
@@ -312,35 +305,25 @@ def evaluating(model, datas, best_F):
             prediction.append(line)
             confusion_matrix[true_id, pred_id] += 1
         prediction.append('')
-    predf = eval_temp + '/pred.' + name
-    scoref = eval_temp + '/score.' + name
+    predf = os.path.join(args.dir, postfix + '_pred.' + args.model_name)
+    scoref = os.path.join(args.dir, postfix + '_score.' + args.model_name)
 
     with open(predf, 'w') as f:
         f.write('\n'.join(prediction))
 
-    os.system('%s < %s > %s' % (eval_script, predf, scoref))
+    os.system('%s < %s > %s' % (args.eval_script, predf, scoref))
 
     eval_lines = [l.rstrip() for l in codecs.open(scoref, 'r', 'utf8')]
-
     for i, line in enumerate(eval_lines):
         print(line)
-        if i == 1:
+        if i == 1 and postfix == "dev":
             new_F = float(line.strip().split()[-1])
             if new_F > best_F:
                 best_F = new_F
                 save = True
                 print('the best F is ', new_F)
+            
 
-    # print(("{: >2}{: >7}{: >7}%s{: >9}" % ("{: >7}" * confusion_matrix.size(0))).format(
-        # "ID", "NE", "Total",
-        # *([id_to_tag[i] for i in range(confusion_matrix.size(0))] + ["Percent"])
-    # ))
-    # for i in range(confusion_matrix.size(0)):
-        # print(("{: >2}{: >7}{: >7}%s{: >9}" % ("{: >7}" * confusion_matrix.size(0))).format(
-            # str(i), id_to_tag[i], str(confusion_matrix[i].sum()),
-            # *([confusion_matrix[i][j] for j in range(confusion_matrix.size(0))] +
-            #   ["%.3f" % (confusion_matrix[i][i] * 100. / max(1, confusion_matrix[i].sum()))])
-        # ))
     return best_F, new_F, save
 
 model.train(True)
@@ -395,37 +378,20 @@ for epoch in range(1, 10001):
         torch.nn.utils.clip_grad_norm(model.parameters(), 5.0)
         optimizer.step()
 
-        # if count % plot_every == 0:
-            # loss /= plot_every
-            # print(count, ': ', loss)
-            # if losses == []:
-                # losses.append(loss)
-            # losses.append(loss)
-            # text = '<p>' + '</p><p>'.join([str(l) for l in losses[-9:]]) + '</p>'
-            # losswin = 'loss_' + name
-            # textwin = 'loss_text_' + name
-            # vis.line(np.array(losses), X=np.array([plot_every*i for i in range(len(losses))]),
-                #  win=losswin, opts={'title': losswin, 'legend': ['loss']})
-            # vis.text(text, win=textwin, opts={'title': textwin})
-            # loss = 0.0
-
         if count % (eval_every) == 0 and count > (eval_every * 20) or \
                 count % (eval_every*4) == 0 and count < (eval_every * 20):
             model.train(False)
             print(count, ": ", loss / eval_every)
             loss = 0.0
             # best_train_F, new_train_F, _ = evaluating(model, test_train_data, best_train_F)
-            best_dev_F, new_dev_F, save = evaluating(model, dev_data, best_dev_F)
+            best_dev_F, new_dev_F, save = evaluating(model, dev_data, best_dev_F, "dev")
             if save:
-                torch.save(model.state_dict(), model_name)
-            # best_test_F, new_test_F, _ = evaluating(model, test_data, best_test_F)
+                print("********************", "Saving...", "*****************")
+                torch.save(model.state_dict(), os.path.join(args.dir, args.model_name))
+                best_test_F, new_test_F, _ = evaluating(model, test_data, best_test_F, "eval")
             sys.stdout.flush()
 
-            # all_F.append([new_train_F, new_dev_F, new_test_F])
-            Fwin = 'F-score of {train, dev, test}_' + name
-            # vis.line(np.array(all_F), win=Fwin,
-                #  X=np.array([eval_every*i for i in range(len(all_F))]),
-                #  opts={'title': Fwin, 'legend': ['train', 'dev', 'test']})
+            Fwin = 'F-score of {train, dev, test}_' + args.model_name
             model.train(True)
 
         if count % len(train_data) == 0:
@@ -433,6 +399,3 @@ for epoch in range(1, 10001):
 
 
 print(time.time() - t)
-
-# plt.plot(losses)
-# plt.show()
