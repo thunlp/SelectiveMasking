@@ -10,7 +10,10 @@ source $HOME/nvidia-bert/data/utils/config.sh
 
 OUTPUT_DIR=${TARGET_DIR}/hdf5_shards
 mkdir -p ${OUTPUT_DIR}
-
+LOWER_CASE_SWITCH=""
+if [ "$DO_LOWER_CASE" = true ] ; then
+  LOWER_CASE_SWITCH="--do_lower_case" 
+fi
 # OUTPUT_FILE="${OUTPUT_DIR}/${SHARD_INDEX}.hdf5"
 echo "Bert model: ${BERT_MODEL}"
 CUDA_VISIBLE_DEVICES=${SHARD_INDEX} python3 $HOME/nvidia-bert/create_pretraining_data.py \
@@ -18,7 +21,6 @@ CUDA_VISIBLE_DEVICES=${SHARD_INDEX} python3 $HOME/nvidia-bert/create_pretraining
   --input_prefix=${INPUT_PREFIX} \
   --output_dir=${OUTPUT_DIR} \
   --vocab_file=${VOCAB_FILE} \
-  --do_lower_case \
   --max_seq_length=${MAX_SEQUENCE_LENGTH} \
   --max_predictions_per_seq=${MAX_PREDICTIONS_PER_SEQUENCE} \
   --masked_lm_prob=${MASKED_LM_PROB} \
@@ -28,5 +30,6 @@ CUDA_VISIBLE_DEVICES=${SHARD_INDEX} python3 $HOME/nvidia-bert/create_pretraining
   --task_name="Ner" \
   --downstream_config="${HOME}/nvidia-bert/downstream_config.json" \
   --local_rank=${SHARD_INDEX} \
-  --gpus=${N_PROCS_PREPROCESS}
+  --gpus=${N_PROCS_PREPROCESS} \
+  ${LOWER_CASE_SWITCH} 
 

@@ -238,11 +238,13 @@ def main():
     else:
         if args.resume_step == -1:
             model_names = [f for f in os.listdir(args.output_dir) if f.endswith(".pt")]
+            print(model_names)
             args.resume_step = max([int(x.split('.pt')[0].split('_')[1].strip()) for x in model_names])
         
         global_step = args.resume_step
 
         checkpoint = torch.load(os.path.join(args.output_dir, "ckpt_{}.pt".format(global_step)), map_location="cpu")
+        print(checkpoint.keys())
         model.load_state_dict(checkpoint['model'], strict=False)
 
         print("resume step from ", args.resume_step)
