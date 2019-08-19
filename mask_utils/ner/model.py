@@ -129,31 +129,32 @@ class BiLSTM_CRF(nn.Module):
 
         return score
 
-    def _get_lstm_features(self, sentence, chars2, caps, chars2_length, d):
+    def _get_lstm_features(self, sentence_b, chars2_b, caps_b, chars2_length_b, d):
 
-        if self.char_mode == 'LSTM':
-            # self.char_lstm_hidden = self.init_lstm_hidden(dim=self.char_lstm_dim, bidirection=True, batchsize=chars2.size(0))
-            chars_embeds = self.char_embeds(chars2).transpose(1, 2)
-            packed = torch.nn.utils.rnn.pack_padded_sequence(
-                chars_embeds, chars2_length)
-            lstm_out, _ = self.char_lstm(packed)
-            outputs, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(
-                lstm_out)
-            outputs = outputs.transpose(1, 2)
-            chars_embeds_temp = torch.FloatTensor(
-                torch.zeros((outputs.size(0), outputs.size(2))))
-            if self.use_gpu:
-                chars_embeds_temp = chars_embeds_temp.cuda()
-            for i, index in enumerate(output_lengths):
-                chars_embeds_temp[i] = torch.cat(
-                    (outputs[i, index-1, :self.char_lstm_dim], outputs[i, 0, self.char_lstm_dim:]))
-            chars_embeds = chars_embeds_temp.clone()
-            for i in range(chars_embeds.size(0)):
-                chars_embeds[d[i]] = chars_embeds_temp[i]
-
+        # if self.char_mode == 'LSTM':
+        #     # self.char_lstm_hidden = self.init_lstm_hidden(dim=self.char_lstm_dim, bidirection=True, batchsize=chars2.size(0))
+        #     chars_embeds = self.char_embeds(chars2).transpose(1, 2)
+        #     packed = torch.nn.utils.rnn.pack_padded_sequence(
+        #         chars_embeds, chars2_length)
+        #     lstm_out, _ = self.char_lstm(packed)
+        #     outputs, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(
+        #         lstm_out)
+        #     outputs = outputs.transpose(1, 2)
+        #     chars_embeds_temp = torch.FloatTensor(
+        #         torch.zeros((outputs.size(0), outputs.size(2))))
+        #     if self.use_gpu:
+        #         chars_embeds_temp = chars_embeds_temp.cuda()
+        #     for i, index in enumerate(output_lengths):
+        #         chars_embeds_temp[i] = torch.cat(
+        #             (outputs[i, index-1, :self.char_lstm_dim], outputs[i, 0, self.char_lstm_dim:]))
+        #     chars_embeds = chars_embeds_temp.clone()
+        #     for i in range(chars_embeds.size(0)):
+        #         chars_embeds[d[i]] = chars_embeds_temp[i]
         if self.char_mode == 'CNN':
-            chars_embeds = self.char_embeds(chars2).unsqueeze(1)
+            chars_embeds = self.char_embeds(chars2_b)
             chars_cnn_out3 = self.char_cnn3(chars_embeds)
+            print("get features")
+            exit(0)
             chars_embeds = nn.functional.max_pool2d(chars_cnn_out3,
                                                     kernel_size=(chars_cnn_out3.size(2), 1)).view(chars_cnn_out3.size(0), self.out_channels)
 
@@ -162,19 +163,21 @@ class BiLSTM_CRF(nn.Module):
         # h = nn.functional.relu(self.hw_trans(chars_embeds))
         # chars_embeds = g * h + (1 - g) * chars_embeds
 
-        embeds = self.word_embeds(sentence)
+        embeds = self.word_embeds(sentence_b)
         if self.n_cap and self.cap_embedding_dim:
             cap_embedding = self.cap_embeds(caps)
 
         if self.n_cap and self.cap_embedding_dim:
-            embeds = torch.cat((embeds, chars_embeds, cap_embedding), 1)
+            embeds = torch.cat((embeds, chars_embeds, cap_embedding), 2)
         else:
-            embeds = torch.cat((embeds, chars_embeds), 1)
-
-        embeds = embeds.unsqueeze(1)
+            embeds = torch.cat((embeds, chars_embeds), 2)
+        
+        bs = sentence_b.size(0)
+        sentence_len = sentence_b.size(1)
+        # embeds = embeds.unsqueeze(1)
         embeds = self.dropout(embeds)
         lstm_out, _ = self.lstm(embeds)
-        lstm_out = lstm_out.view(len(sentence), self.hidden_dim*2)
+        lstm_out = lstm_out.view(bs, sentence_len, self.hidden_dim*2)
         lstm_out = self.dropout(lstm_out)
         lstm_feats = self.hidden2tag(lstm_out)
         return lstm_feats
@@ -254,13 +257,19 @@ class BiLSTM_CRF(nn.Module):
             return scores
 
     def forward(self, sentence, chars, caps, chars2_length, d):
-        feats = self._get_lstm_features(
+        feats_b = self._get_lstm_features(
             sentence, chars, caps, chars2_length, d)
         # viterbi to get tag_seq
+        score_b = []
+        tag_seq_b = []
+        print("forward")
         if self.use_crf:
-            score, tag_seq = self.viterbi_decode(feats)
+            for feats in feats_b:
+                score, tag_seq = self.viterbi_decode(feats)
+                score_b.append(score)
+                tag_seq_b.append(tag_seq)
         else:
-            score, tag_seq = torch.max(feats, 1)
+            score, tag_seq = torch.max(feats, 2)
             tag_seq = list(tag_seq.cpu().data)
 
         return score, tag_seq

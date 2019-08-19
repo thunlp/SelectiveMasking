@@ -128,12 +128,14 @@ class Ner(MaskGenerator):
 
         dwords = torch.LongTensor(data['words'])
         dcaps = torch.LongTensor(caps)
-
+        print("OK")
         if self.gpu:
             val, out = self.model(dwords.cuda(), chars2_mask.cuda(), dcaps.cuda(), chars2_length, d)
         else:
             val, out = self.model(dwords, chars2_mask, dcaps, chars2_length, d)
-
+        print(val)
+        print(out)
+        exit(0)
         pred_result = [(word, self.id_to_tag[pred_id]) for (word, pred_id) in zip(words, out)]
         
         return pred_result

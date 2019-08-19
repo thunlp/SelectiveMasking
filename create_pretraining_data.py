@@ -252,10 +252,7 @@ def create_training_instances(input_files, task_name, generator, tokenizer, max_
                 # tokens = tokenizer.tokenize(line)
                 signi_indexes = []
                 if task_name:
-                    try:
-                        signi_indexes = generator(line)
-                    except RuntimeError:
-                        continue
+                    signi_indexes = generator(line)
 
                 tokens, valid_positions = tokenize(tokenizer, line)
                 m_info = create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked_lm_prob, max_predictions_per_seq / max_seq_length, vocab_words, rng)
