@@ -79,10 +79,10 @@ class BiLSTM_CRF(nn.Module):
         if self.n_cap and self.cap_embedding_dim:
             if self.char_mode == 'LSTM':
                 self.lstm = nn.LSTM(
-                    embedding_dim+char_lstm_dim*2+cap_embedding_dim, hidden_dim, bidirectional=True)
+                    embedding_dim+char_lstm_dim*2+cap_embedding_dim, hidden_dim, bidirectional=True, batch_first=True)
             if self.char_mode == 'CNN':
                 self.lstm = nn.LSTM(
-                    embedding_dim+self.out_channels+cap_embedding_dim, hidden_dim, bidirectional=True)
+                    embedding_dim+self.out_channels+cap_embedding_dim, hidden_dim, bidirectional=True, batch_first=True)
         else:
             if self.char_mode == 'LSTM':
                 self.lstm = nn.LSTM(
@@ -133,13 +133,13 @@ class BiLSTM_CRF(nn.Module):
 
         if self.char_mode == 'LSTM':
             # self.char_lstm_hidden = self.init_lstm_hidden(dim=self.char_lstm_dim, bidirection=True, batchsize=chars2.size(0))
-            chars_embeds = self.char_embeds(chars2).transpose(0, 1)
+            chars_embeds = self.char_embeds(chars2).transpose(1, 2)
             packed = torch.nn.utils.rnn.pack_padded_sequence(
                 chars_embeds, chars2_length)
             lstm_out, _ = self.char_lstm(packed)
             outputs, output_lengths = torch.nn.utils.rnn.pad_packed_sequence(
                 lstm_out)
-            outputs = outputs.transpose(0, 1)
+            outputs = outputs.transpose(1, 2)
             chars_embeds_temp = torch.FloatTensor(
                 torch.zeros((outputs.size(0), outputs.size(2))))
             if self.use_gpu:
