@@ -34,6 +34,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Datas
 from torch.utils.data.distributed import DistributedSampler
 import math
 from apex import amp
+import json
 
 
 
@@ -119,6 +120,9 @@ def main():
                         help="The output directory where the model checkpoints will be written.")
 
     ## Other parameters
+    parser.add_argument("--load", 
+                        default="",
+                        type=str)
     parser.add_argument("--max_seq_length",
                         default=512,
                         type=int,
@@ -230,21 +234,28 @@ def main():
 
     # Prepare model
     config = BertConfig.from_json_file(args.config_file)
-    model = BertForPreTraining(config)
+    if args.load:
+        print("load")
+        model = BertForPreTraining.from_pretrained(args.load)
+    else:
+        model = BertForPreTraining(config)
 
+    # model_to_save = model.module if hasattr(
+        # model, 'module') else model  # Only save the model it-self
+    pretrained_model_file = os.path.join(
+        args.output_dir, "pytorch_model.bin")
+    torch.save(model.state_dict(), pretrained_model_file)
 
     if not args.resume_from_checkpoint:
         global_step = 0
     else:
         if args.resume_step == -1:
             model_names = [f for f in os.listdir(args.output_dir) if f.endswith(".pt")]
-            print(model_names)
             args.resume_step = max([int(x.split('.pt')[0].split('_')[1].strip()) for x in model_names])
         
         global_step = args.resume_step
 
         checkpoint = torch.load(os.path.join(args.output_dir, "ckpt_{}.pt".format(global_step)), map_location="cpu")
-        print(checkpoint.keys())
         model.load_state_dict(checkpoint['model'], strict=False)
 
         print("resume step from ", args.resume_step)
@@ -310,6 +321,8 @@ def main():
     logger.info("  Batch size = %d", args.train_batch_size)
     print("  LR = ", args.learning_rate)
     
+
+
 
     model.train()
     print("Training. . .")
@@ -392,6 +405,13 @@ def main():
                         torch.save({'model' : model_to_save.state_dict(), 
                                 'optimizer' : optimizer.state_dict(), 
                                 'files' : [f_id] + files}, output_save_file)
+
+                        pretrained_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
+                        # pretrained_config_file = os.path.join(args.output_dir, "bert_config.json")
+                        torch.save(model_to_save.state_dict(), pretrained_model_file)
+                        # with open(pretrained_config_file, "w") as f:
+                            # json.dump(config, f)
+
                                 
                         most_recent_ckpts_paths.append(output_save_file)
                         if len(most_recent_ckpts_paths) > 3:

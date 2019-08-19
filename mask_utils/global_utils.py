@@ -67,6 +67,17 @@ def mask_sentence(s, mask_num=0, mask_rate=0):
             new_s.append(s[i])
     return new_s, rand_list
 
+def mask_1word(s, pos):
+    if len(s) <= 1:
+        return s, []
+    new_s = []
+    for i in range(len(s)):
+        if i == pos:
+            continue
+        else:
+            new_s.append(s[i])
+    return new_s, [pos]
+
 
 def item_detail(pred, masked_pred, mask_pos, print_detail=False):
     i_masked = 0

@@ -6,7 +6,7 @@ import random
 
 from .ner import loader
 from .ner.model import BiLSTM_CRF
-from .global_utils import mask_sentence, cap_feature
+from .global_utils import mask_sentence, cap_feature, mask_1word
 
 # from ner_model import NerModel
 from torch import nn
@@ -34,6 +34,9 @@ class Ner(MaskGenerator):
         super(Ner, self).__init__(config["mask_samp"], config["mask_num"], config["mask_rate"], config["gpu"])
         mappings = self.load_mapping(config["mapping_file"])
         self.word_to_id = mappings['word_to_id']
+        self.D = {}
+        for key, value in self.word_to_id.items():
+            self.D[value] = key
         self.tag_to_id = mappings['tag_to_id']
         self.id_to_tag = {k[1]: k[0] for k in self.tag_to_id.items()}
         self.char_to_id = mappings['char_to_id']
@@ -87,10 +90,11 @@ class Ner(MaskGenerator):
 
         # masked data
         masked_datas = []
-        for samp in range(self.mask_samp):
+        # for samp in range(self.mask_samp):
+        for pos in range(len(tokens)):
             masked_data, masked_poses = [], []
-            new_s, mask_pos = mask_sentence(tokens, self.mask_num, self.mask_rate)
-            # display_diff(s, new_s, mask_pos)
+            new_s, mask_pos = mask_1word(tokens, pos)
+            # new_s, mask_pos = mask_sentence(tokens, self.mask_num, self.mask_rate)
             words = [self.word_to_id[f(w) if f(w) in self.word_to_id else '<UNK>']
                      for w in new_s]
             # Skip characters that are not in the training set
@@ -150,6 +154,7 @@ class Ner(MaskGenerator):
                 masked_prediction = self.evaluate(masked_data['data'])
             except ValueError:
                 print(masked_datas)
+                raise ValueError
             diff_words_num = 0
             # print(prediction)
             # print(masked_prediction)
@@ -160,8 +165,19 @@ class Ner(MaskGenerator):
                     if prediction[index][1] != masked_prediction[index_masked][1]:
                         diff_words_num += 1
                     index_masked += 1
+            # if diff_words_num > 0:
+                # print(self.D[data['words'][masked_data['pos'][0]]])
+                # print([item[1] for item in prediction])
+                # print([item[1] for item in masked_prediction])
             for pos in masked_data["pos"]:
                 pos_signi[pos] += diff_words_num
+        # print([self.D[w] for w in data["words"]])
+        # print(pos_signi)
+        L = []
+        for i in range(len(pos_signi)):
+            if pos_signi[i] > 0:
+                L.append(self.D[data["words"][i]])
+        # print(L)
 
         zip_list = list(enumerate(pos_signi))
         random.shuffle(zip_list)
