@@ -238,7 +238,7 @@ def create_training_instances(input_files, task_name, generator, tokenizer, max_
         with open(input_file, "r") as reader:
             lines = reader.readlines()
             i = 0
-            for line in tqdm(lines, desc="Processing"):
+            for line in tqdm(lines[76:86], desc="Processing"):
                 line = tokenization.convert_to_unicode(line)
                 line = line.strip()
 

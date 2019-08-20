@@ -152,13 +152,14 @@ class Ner(MaskGenerator):
         for (batch_index, chars2) in enumerate(chars2_b):
             for i, c in enumerate(chars2):
                 chars2_mask_b[batch_index][i, :chars2_length_b[batch_index][i]] = c
-        chars2_mask_b = torch.LongTensor(chars2_mask_b)
+        chars2_mask_b = [torch.LongTensor(chars2_mask) for chars2_mask in chars2_mask_b]
 
         dwords_b = torch.LongTensor([data["data"]["words"] for data in datas])
         dcaps_b = torch.LongTensor(caps_b)
         
         if self.gpu:
-            val, out_b = self.model(dwords_b.cuda(), chars2_mask_b.cuda(), dcaps_b.cuda(), chars2_length_b, d)
+            chars2_mask_b = [chars2_mask.cuda() for chars2_mask in chars2_mask_b]
+            val, out_b = self.model(dwords_b.cuda(), chars2_mask_b, dcaps_b.cuda(), chars2_length_b, d)
         else:
             val, out_b = self.model(dwords_b, chars2_mask_b, dcaps_b, chars2_length_b, d)
 
@@ -166,12 +167,20 @@ class Ner(MaskGenerator):
 
         return pred_results
 
+    def check_all_same(self, prediction):
+        for pred in prediction:
+            if pred[1] != 'O':
+                return False
+        return True
+
     def generate_mask(self, data, masked_datas):
         try:
-            prediction = self.evaluate_batch([{"data": data}])
+            prediction = self.evaluate_batch([{"data": data}])[0]
         except ValueError:
             print("OOOO")
         pos_signi = [0 for w in data['words']]
+
+        self.check_all_same(prediction)
 
         try:
             masked_predictions = self.evaluate_batch(masked_datas)
@@ -217,13 +226,13 @@ class Ner(MaskGenerator):
                 # print([item[1] for item in masked_prediction])
         #    for pos in masked_data["pos"]:
         #        pos_signi[pos] += diff_words_num
-        # print([self.D[w] for w in data["words"]])
-        # print(pos_signi)
+        print([self.D[w] for w in data["words"]])
+        print(pos_signi)
         L = []
         for i in range(len(pos_signi)):
             if pos_signi[i] > 0:
                 L.append(self.D[data["words"][i]])
-        # print(L)
+        print(L)
 
         zip_list = list(enumerate(pos_signi))
         random.shuffle(zip_list)
