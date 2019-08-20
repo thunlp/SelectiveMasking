@@ -238,6 +238,7 @@ def create_training_instances(input_files, task_name, generator, tokenizer, max_
         with open(input_file, "r") as reader:
             lines = reader.readlines()
             i = 0
+            all_other_num = 0
             for line in tqdm(lines, desc="Processing"):
                 line = tokenization.convert_to_unicode(line)
                 line = line.strip()
@@ -252,15 +253,16 @@ def create_training_instances(input_files, task_name, generator, tokenizer, max_
                 # tokens = tokenizer.tokenize(line)
                 signi_indexes = []
                 if task_name:
-                    try:
-                        signi_indexes = generator(line)
-                    except RuntimeError:
+                    signi_indexes = generator(line)
+                    if signi_indexes is None:
+                        all_other_num += 1
                         continue
 
                 tokens, valid_positions = tokenize(tokenizer, line)
                 m_info = create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked_lm_prob, max_predictions_per_seq / max_seq_length, vocab_words, rng)
                 if tokens:
                     all_documents[-1].append(MaskedTokenInstance(tokens=tokens, info=m_info))
+            print("All Other Num", all_other_num)
 
     # Remove empty documents
     all_documents = [x for x in all_documents if x]

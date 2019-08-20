@@ -142,11 +142,21 @@ class Ner(MaskGenerator):
         
         return pred_result
 
+    def check_all_others(self, prediction):
+        for pred in prediction:
+            if pred[1] != "O":
+                return False
+        return True
+
     def generate_mask(self, data, masked_datas):
         try:
             prediction = self.evaluate(data)
         except ValueError:
             print("OOOO")
+
+        if self.check_all_others(prediction):
+            return None
+
         pos_signi = [0 for w in data['words']]
         for masked_data in masked_datas:
             # print(masked_data['pos'])
@@ -162,7 +172,9 @@ class Ner(MaskGenerator):
             for index in range(len(prediction)):
                 if index not in masked_data['pos']:
                     assert prediction[index][0] == masked_prediction[index_masked][0]
-                    if prediction[index][1] != masked_prediction[index_masked][1]:
+                    tag = prediction[index][1].split('-')[-1]
+                    mask_tag = masked_prediction[index_masked][1].split('-')[-1]
+                    if tag != mask_tag:
                         diff_words_num += 1
                     index_masked += 1
             # if diff_words_num > 0:
