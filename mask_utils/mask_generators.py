@@ -148,11 +148,18 @@ class Ner(MaskGenerator):
         d = {}
         chars2_length_b = [[len(c) for c in chars2] for chars2 in chars2_b]
         char_maxl_b = [max(chars2_length) for chars2_length in chars2_length_b]
-        chars2_mask_b = [np.zeros((len(chars2_length), char_maxl), dtype='int') for (chars2_length, char_maxl) in zip(chars2_length_b, char_maxl_b)]
+        char_maxl = max(char_maxl_b)
+        chars2_mask_b = [np.zeros((len(chars2_length), char_maxl), dtype='int') for chars2_length in chars2_length_b]
         for (batch_index, chars2) in enumerate(chars2_b):
             for i, c in enumerate(chars2):
                 chars2_mask_b[batch_index][i, :chars2_length_b[batch_index][i]] = c
-        chars2_mask_b = [torch.LongTensor(chars2_mask) for chars2_mask in chars2_mask_b]
+        temp = []
+        for chars2_mask in chars2_mask_b:
+            t = torch.LongTensor(chars2_mask)
+            print(t)
+            temp.append(t)
+        chars2_mask_b = temp
+        # chars2_mask_b = [torch.LongTensor(chars2_mask) for chars2_mask in chars2_mask_b]
 
         dwords_b = torch.LongTensor([data["data"]["words"] for data in datas])
         dcaps_b = torch.LongTensor(caps_b)

@@ -155,12 +155,13 @@ class BiLSTM_CRF(nn.Module):
             tempL = []
             # print(chars_embeds_b.shape)
             for chars_embeds in chars_embeds_b:
-                # print(chars_embeds.shape)
                 chars_embeds = chars_embeds.unsqueeze(1)
                 chars_cnn_out3 = self.char_cnn3(chars_embeds)
                 chars_embeds = nn.functional.max_pool2d(chars_cnn_out3, kernel_size=(chars_cnn_out3.size(2), 1)).view(chars_cnn_out3.size(0), self.out_channels)
+                print(chars_embeds.shape)
                 tempL.append(chars_embeds)
             chars_embeds_b = torch.stack(tempL, 0)
+            print(chars_embeds_b.shape)
 
             # chars_embeds = self.char_embeds(chars2_b).transpose(0, 1)
             # chars_cnn_out3 = self.char_cnn3(chars_embeds)
