@@ -117,27 +117,25 @@ class Ner(MaskGenerator):
         words = data['str_words']
         chars2 = data['chars']
         caps = data['caps']
-        # assume char mode is LSTM
+        # assume char mode is CNN
         d = {}
         chars2_length = [len(c) for c in chars2]
-        try:
-            char_maxl = max(chars2_length)
-        except ValueError:
-            print(data)
-            raise ValueError
-        chars2_mask = np.zeros(
-            (len(chars2_length), char_maxl), dtype='int')
+        char_maxl = max(chars2_length)
+        chars2_mask = np.zeros((len(chars2_length), char_maxl), dtype='int')
         for i, c in enumerate(chars2):
             chars2_mask[i, :chars2_length[i]] = c
         chars2_mask = torch.LongTensor(chars2_mask)
+
         dwords = torch.LongTensor(data['words'])
         dcaps = torch.LongTensor(caps)
-
+        print("OK")
         if self.gpu:
             val, out = self.model(dwords.cuda(), chars2_mask.cuda(), dcaps.cuda(), chars2_length, d)
         else:
             val, out = self.model(dwords, chars2_mask, dcaps, chars2_length, d)
-
+        print(val)
+        print(out)
+        exit(0)
         pred_result = [(word, self.id_to_tag[pred_id]) for (word, pred_id) in zip(words, out)]
         
         return pred_result
@@ -148,9 +146,43 @@ class Ner(MaskGenerator):
                 return False
         return True
 
+    def evaluate_batch(self, datas):
+        words_b = [data["data"]['str_words'] for data in datas]
+        chars2_b = [data["data"]['chars'] for data in datas]
+        caps_b = [data["data"]['caps'] for data in datas]
+
+        d = {}
+        chars2_length_b = [[len(c) for c in chars2] for chars2 in chars2_b]
+        char_maxl_b = [max(chars2_length) for chars2_length in chars2_length_b]
+        char_maxl = max(char_maxl_b)
+        chars2_mask_b = [np.zeros((len(chars2_length), char_maxl), dtype='int') for chars2_length in chars2_length_b]
+        for (batch_index, chars2) in enumerate(chars2_b):
+            for i, c in enumerate(chars2):
+                chars2_mask_b[batch_index][i, :chars2_length_b[batch_index][i]] = c
+        temp = []
+        for chars2_mask in chars2_mask_b:
+            t = torch.LongTensor(chars2_mask)
+            # print(t)
+            temp.append(t)
+        chars2_mask_b = temp
+        # chars2_mask_b = [torch.LongTensor(chars2_mask) for chars2_mask in chars2_mask_b]
+
+        dwords_b = torch.LongTensor([data["data"]["words"] for data in datas])
+        dcaps_b = torch.LongTensor(caps_b)
+        
+        if self.gpu:
+            chars2_mask_b = [chars2_mask.cuda() for chars2_mask in chars2_mask_b]
+            val, out_b = self.model(dwords_b.cuda(), chars2_mask_b, dcaps_b.cuda(), chars2_length_b, d)
+        else:
+            val, out_b = self.model(dwords_b, chars2_mask_b, dcaps_b, chars2_length_b, d)
+
+        pred_results = [[(word, self.id_to_tag[pred_id]) for (word, pred_id) in zip(words, out)] for (words, out) in zip(words_b, out_b)]
+
+        return pred_results
+
     def generate_mask(self, data, masked_datas):
         try:
-            prediction = self.evaluate(data)
+            prediction = self.evaluate_batch([{"data": data}])[0]
         except ValueError:
             print("OOOO")
 
@@ -158,38 +190,65 @@ class Ner(MaskGenerator):
             return None
 
         pos_signi = [0 for w in data['words']]
-        for masked_data in masked_datas:
-            # print(masked_data['pos'])
-            try:
-                masked_prediction = self.evaluate(masked_data['data'])
-            except ValueError:
-                print(masked_datas)
-                raise ValueError
+
+        # self.check_all_same(prediction)
+        # print([pred[1] for pred in prediction])
+
+        try:
+            masked_predictions = self.evaluate_batch(masked_datas)
+        except ValueError:
+            print(masked_datas)
+            raise ValueError
+
+        # print([pred[1] for pred in masked_predictions[0]])
+
+        for i in range(len(masked_datas)):
+            masked_prediction = masked_predictions[i]
+            masked_data = masked_datas[i]
             diff_words_num = 0
-            # print(prediction)
-            # print(masked_prediction)
             index_masked = 0
             for index in range(len(prediction)):
-                if index not in masked_data['pos']:
+                if index not in masked_data["pos"]:
                     assert prediction[index][0] == masked_prediction[index_masked][0]
                     tag = prediction[index][1].split('-')[-1]
                     mask_tag = masked_prediction[index_masked][1].split('-')[-1]
                     if tag != mask_tag:
                         diff_words_num += 1
                     index_masked += 1
+
+            for pos in masked_data["pos"]:
+                pos_signi[pos] += diff_words_num
+
+        # for masked_data in masked_datas:
+        #     # print(masked_data['pos'])
+        #     try:
+        #         masked_prediction = self.evaluate(masked_data['data'])
+        #     except ValueError:
+        #         print(masked_datas)
+        #         raise ValueError
+        #     diff_words_num = 0
+        #     # print(prediction)
+        #     # print(masked_prediction)
+        #     index_masked = 0
+        #     for index in range(len(prediction)):
+        #         if index not in masked_data['pos']:
+        #             assert prediction[index][0] == masked_prediction[index_masked][0]
+        #             if prediction[index][1] != masked_prediction[index_masked][1]:
+        #                 diff_words_num += 1
+        #             index_masked += 1
             # if diff_words_num > 0:
                 # print(self.D[data['words'][masked_data['pos'][0]]])
                 # print([item[1] for item in prediction])
                 # print([item[1] for item in masked_prediction])
-            for pos in masked_data["pos"]:
-                pos_signi[pos] += diff_words_num
-        # print([self.D[w] for w in data["words"]])
-        # print(pos_signi)
+        #    for pos in masked_data["pos"]:
+        #        pos_signi[pos] += diff_words_num
+        print([self.D[w] for w in data["words"]])
+        print(pos_signi)
         L = []
         for i in range(len(pos_signi)):
             if pos_signi[i] > 0:
                 L.append(self.D[data["words"][i]])
-        # print(L)
+        print(L)
 
         zip_list = list(enumerate(pos_signi))
         random.shuffle(zip_list)
