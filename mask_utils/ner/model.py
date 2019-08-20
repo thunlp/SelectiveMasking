@@ -151,10 +151,8 @@ class BiLSTM_CRF(nn.Module):
         #     for i in range(chars_embeds.size(0)):
         #         chars_embeds[d[i]] = chars_embeds_temp[i]
         if self.char_mode == 'CNN':
-            chars_embeds = self.char_embeds(chars2_b)
+            chars_embeds = self.char_embeds(chars2_b).transpose(0, 1)
             chars_cnn_out3 = self.char_cnn3(chars_embeds)
-            print("get features")
-            exit(0)
             chars_embeds = nn.functional.max_pool2d(chars_cnn_out3,
                                                     kernel_size=(chars_cnn_out3.size(2), 1)).view(chars_cnn_out3.size(0), self.out_channels)
 

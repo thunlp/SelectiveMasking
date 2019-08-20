@@ -141,9 +141,9 @@ class Ner(MaskGenerator):
         return pred_result
 
     def evaluate_batch(self, datas):
-        words_b = [data['str_words'] for data in datas]
-        chars2_b = [data['chars'] for data in datas]
-        caps_b = [data['caps'] for data in datas]
+        words_b = [data["data"]['str_words'] for data in datas]
+        chars2_b = [data["data"]['chars'] for data in datas]
+        caps_b = [data["data"]['caps'] for data in datas]
 
         d = {}
         chars2_length_b = [[len(c) for c in chars2] for chars2 in chars2_b]
@@ -154,7 +154,7 @@ class Ner(MaskGenerator):
                 chars2_mask_b[batch_index][i, :chars2_length_b[batch_index][i]] = c
         chars2_mask_b = torch.LongTensor(chars2_mask_b)
 
-        dwords_b = torch.LongTensor([data["words"] for data in datas])
+        dwords_b = torch.LongTensor([data["data"]["words"] for data in datas])
         dcaps_b = torch.LongTensor(caps_b)
         
         if self.gpu:
@@ -168,7 +168,7 @@ class Ner(MaskGenerator):
 
     def generate_mask(self, data, masked_datas):
         try:
-            prediction = self.evaluate(data)
+            prediction = self.evaluate_batch([{"data": data}])
         except ValueError:
             print("OOOO")
         pos_signi = [0 for w in data['words']]
