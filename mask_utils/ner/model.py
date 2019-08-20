@@ -86,10 +86,10 @@ class BiLSTM_CRF(nn.Module):
         else:
             if self.char_mode == 'LSTM':
                 self.lstm = nn.LSTM(
-                    embedding_dim+char_lstm_dim*2, hidden_dim, bidirectional=True)
+                    embedding_dim+char_lstm_dim*2, hidden_dim, bidirectional=True, batch_first=True)
             if self.char_mode == 'CNN':
                 self.lstm = nn.LSTM(
-                    embedding_dim+self.out_channels, hidden_dim, bidirectional=True)
+                    embedding_dim+self.out_channels, hidden_dim, bidirectional=True, batch_first=True)
         init_lstm(self.lstm)
         self.hw_trans = nn.Linear(self.out_channels, self.out_channels)
         self.hw_gate = nn.Linear(self.out_channels, self.out_channels)
@@ -172,7 +172,6 @@ class BiLSTM_CRF(nn.Module):
         # g = nn.functional.sigmoid(t)
         # h = nn.functional.relu(self.hw_trans(chars_embeds))
         # chars_embeds = g * h + (1 - g) * chars_embeds
-
         embeds_b = self.word_embeds(sentence_b)
         if self.n_cap and self.cap_embedding_dim:
             cap_embedding_b = self.cap_embeds(caps_b)
@@ -181,7 +180,7 @@ class BiLSTM_CRF(nn.Module):
             embeds_b = torch.cat((embeds_b, chars_embeds_b, cap_embedding_b), 2)
         else:
             embeds_b = torch.cat((embeds_b, chars_embeds_b), 2)
-        print(embeds_b.shape)
+
         bs = sentence_b.size(0)
         sentence_len = sentence_b.size(1)
         # embeds = embeds.unsqueeze(1)

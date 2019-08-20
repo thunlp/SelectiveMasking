@@ -188,7 +188,7 @@ class Ner(MaskGenerator):
         pos_signi = [0 for w in data['words']]
 
         # self.check_all_same(prediction)
-        print([pred[1] for pred in prediction])
+        # print([pred[1] for pred in prediction])
 
         try:
             masked_predictions = self.evaluate_batch(masked_datas)
@@ -196,7 +196,7 @@ class Ner(MaskGenerator):
             print(masked_datas)
             raise ValueError
 
-        print([pred[1] for pred in masked_predictions[0]])
+        # print([pred[1] for pred in masked_predictions[0]])
 
         for i in range(len(masked_datas)):
             masked_prediction = masked_predictions[i]
