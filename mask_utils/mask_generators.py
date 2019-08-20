@@ -156,7 +156,7 @@ class Ner(MaskGenerator):
         temp = []
         for chars2_mask in chars2_mask_b:
             t = torch.LongTensor(chars2_mask)
-            print(t)
+            # print(t)
             temp.append(t)
         chars2_mask_b = temp
         # chars2_mask_b = [torch.LongTensor(chars2_mask) for chars2_mask in chars2_mask_b]
@@ -187,13 +187,16 @@ class Ner(MaskGenerator):
             print("OOOO")
         pos_signi = [0 for w in data['words']]
 
-        self.check_all_same(prediction)
+        # self.check_all_same(prediction)
+        print([pred[1] for pred in prediction])
 
         try:
             masked_predictions = self.evaluate_batch(masked_datas)
         except ValueError:
             print(masked_datas)
             raise ValueError
+
+        print([pred[1] for pred in masked_predictions[0]])
 
         for i in range(len(masked_datas)):
             masked_prediction = masked_predictions[i]

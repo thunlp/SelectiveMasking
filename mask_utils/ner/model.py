@@ -158,10 +158,10 @@ class BiLSTM_CRF(nn.Module):
                 chars_embeds = chars_embeds.unsqueeze(1)
                 chars_cnn_out3 = self.char_cnn3(chars_embeds)
                 chars_embeds = nn.functional.max_pool2d(chars_cnn_out3, kernel_size=(chars_cnn_out3.size(2), 1)).view(chars_cnn_out3.size(0), self.out_channels)
-                print(chars_embeds.shape)
+                # print(chars_embeds.shape)
                 tempL.append(chars_embeds)
             chars_embeds_b = torch.stack(tempL, 0)
-            print(chars_embeds_b.shape)
+            # print(chars_embeds_b.shape)
 
             # chars_embeds = self.char_embeds(chars2_b).transpose(0, 1)
             # chars_cnn_out3 = self.char_cnn3(chars_embeds)
@@ -181,7 +181,7 @@ class BiLSTM_CRF(nn.Module):
             embeds_b = torch.cat((embeds_b, chars_embeds_b, cap_embedding_b), 2)
         else:
             embeds_b = torch.cat((embeds_b, chars_embeds_b), 2)
-        
+        print(embeds_b.shape)
         bs = sentence_b.size(0)
         sentence_len = sentence_b.size(1)
         # embeds = embeds.unsqueeze(1)
