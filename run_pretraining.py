@@ -39,7 +39,7 @@ import json
 
 
 from tokenization import BertTokenizer
-from modeling import BertForPreTraining, BertConfig
+from modeling import BertForMaskedLM, BertConfig
 from optimization import BertAdam, BertAdam_FP16
 
 # from fused_adam_local import FusedAdamBert
@@ -236,9 +236,9 @@ def main():
     config = BertConfig.from_json_file(args.config_file)
     if args.load:
         print("load")
-        model = BertForPreTraining.from_pretrained(args.load)
+        model = BertForMaskedLM.from_pretrained(args.load)
     else:
-        model = BertForPreTraining(config)
+        model = BertForMaskedLM(config)
 
     # model_to_save = model.module if hasattr(
         # model, 'module') else model  # Only save the model it-self
@@ -359,7 +359,7 @@ def main():
                 training_steps += 1
                 batch = [t.to(device) for t in batch]
                 input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch#\
-                loss = model(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask, masked_lm_labels=masked_lm_labels, next_sentence_label=next_sentence_labels, checkpoint_activations=args.checkpoint_activations)
+                loss = model(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask, masked_lm_labels=masked_lm_labels,checkpoint_activations=args.checkpoint_activations)
                 if n_gpu > 1:
                     loss = loss.mean() # mean() to average on multi-gpu.
 
@@ -414,7 +414,7 @@ def main():
 
                                 
                         most_recent_ckpts_paths.append(output_save_file)
-                        if len(most_recent_ckpts_paths) > 3:
+                        if len(most_recent_ckpts_paths) > 8:
                             ckpt_to_be_removed = most_recent_ckpts_paths.pop(0)
                             os.remove(ckpt_to_be_removed)
 
