@@ -9,9 +9,9 @@ MASKED_LM_PROB=0.15
 SEED=12345
 DUPE_FACTOR=1
 DO_LOWER_CASE=false
-N_LINES_PER_SHARD_APPROX=19800   # Default=396000 creates 256 shards
+N_LINES_PER_SHARD_APPROX=99000   # Default=396000 creates 256 shards
 
-N_PROCS_PREPROCESS=1    # Adjust this based on memory requirements and available number of cores
+N_PROCS_PREPROCESS=8    # Adjust this based on memory requirements and available number of cores
 
 BERT_BASE_DIR_CASED="/home/gyx/nvidia-bert/vocab/cased_L-12_H-768_A-12"
 BERT_LARGE_DIR_CASED="/home/gyx/nvidia-bert/vocab/cased_L-24_H-1024_A-16"

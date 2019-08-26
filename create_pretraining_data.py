@@ -162,11 +162,12 @@ def create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked
     # save all word parts tokenized from a single word in a list
     if task_name:
         for index in signi_indexes:
-            cand_indexes.append([index])
-            i = index + 1
-            while i < len(valid_positions) and valid_positions[i] == 0:
-                cand_indexes[-1].append(i)
-                i += 1
+            if valid_positions[index] == 1:
+                cand_indexes.append([index])
+                i = index + 1
+                while i < len(valid_positions) and valid_positions[i] == 0:
+                    cand_indexes[-1].append(i)
+                    i += 1
     else:
         # using default strategy to choose mask positions
         # randomly shuffle all indices
@@ -176,11 +177,11 @@ def create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked
             else:
                 cand_indexes[-1].append(i)
         rng.shuffle(cand_indexes)
-
     # output_tokens = list(tokens)
 
     # NOTE changed to len(cand_indexes) * masked_lm_prob
-    num_to_predict = min(max_predictions_sub_seq, max(1, int(round(len(cand_indexes) * masked_lm_prob))))
+    # print(max_predictions_sub_seq, int(round(len(tokens) * masked_lm_prob)))
+    num_to_predict = min(int(max_predictions_sub_seq), max(1, int(round(len(tokens) * masked_lm_prob))))
 
     masked_info = [{} for token in tokens] # if masked, masked symbol, else ""
     masked_lms_len = 0
@@ -219,7 +220,6 @@ def create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked
     # for p in masked_lms:
         # masked_lm_positions.append(p.index)
         # masked_lm_labels.append(p.label)
-
     return masked_info
 
 def create_training_instances(input_files, task_name, generator, tokenizer, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
@@ -253,11 +253,14 @@ def create_training_instances(input_files, task_name, generator, tokenizer, max_
                 # tokens = tokenizer.tokenize(line)
                 signi_indexes = []
                 if task_name:
-                    signi_indexes = generator(line)
+                    try:
+                        signi_indexes = generator(line)
+                    except RuntimeError:
+                        continue
+                        
                     if signi_indexes is None:
                         all_other_num += 1
                         continue
-
                 tokens, valid_positions = tokenize(tokenizer, line)
                 m_info = create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked_lm_prob, max_predictions_per_seq / max_seq_length, vocab_words, rng)
                 if tokens:
@@ -267,7 +270,6 @@ def create_training_instances(input_files, task_name, generator, tokenizer, max_
     # Remove empty documents
     all_documents = [x for x in all_documents if x]
     # rng.shuffle(all_documents)
-
     instances = []
     for _ in range(dupe_factor):
         for document_index in range(len(all_documents)):
@@ -587,7 +589,7 @@ def main():
     args = parser.parse_args()
     print(args)
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
-
+    random.seed(12)
     generator = None
     if args.task_name:
         downstream_config = json.load(open(args.downstream_config))[

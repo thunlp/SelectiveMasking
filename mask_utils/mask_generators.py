@@ -242,13 +242,13 @@ class Ner(MaskGenerator):
                 # print([item[1] for item in masked_prediction])
         #    for pos in masked_data["pos"]:
         #        pos_signi[pos] += diff_words_num
-        print([self.D[w] for w in data["words"]])
-        print(pos_signi)
+        # print([self.D[w] for w in data["words"]])
+        # print(pos_signi)
         L = []
         for i in range(len(pos_signi)):
             if pos_signi[i] > 0:
                 L.append(self.D[data["words"][i]])
-        print(L)
+        # print(L)
 
         zip_list = list(enumerate(pos_signi))
         random.shuffle(zip_list)
@@ -258,5 +258,8 @@ class Ner(MaskGenerator):
     def forward(self, line):
         data, masked_datas = self.prepare_data(line.strip().split())
         # print(data, masked_datas)
+        if len(data["words"]) > 1000:
+            print("TOO LONG", len(data["words"]))
+            return None
         signi_indexes = self.generate_mask(data, masked_datas)
         return signi_indexes

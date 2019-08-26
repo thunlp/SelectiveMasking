@@ -16,7 +16,7 @@ output_file = args.output_file
 doc_seperator = "\n"
 
 line_buffer = []
-shard_size = 19800 # Approximate, will split at next article break
+shard_size = 99000 # Approximate, will split at next article break
 line_counter = 0
 shard_index = 0
 
