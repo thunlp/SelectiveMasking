@@ -32,10 +32,10 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn import CrossEntropyLoss, MSELoss
 
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
 
-from file_utils import WEIGHTS_NAME, CONFIG_NAME
-from modeling import BertForSequenceClassification
+# from file_utils import WEIGHTS_NAME, CONFIG_NAME
+from modeling import BertForSequenceClassification, WEIGHTS_NAME, CONFIG_NAME
 from tokenization import BertTokenizer
 from optimization import BertAdam, warmup_linear
 
@@ -75,6 +75,9 @@ def main():
                         help="The output directory where the model predictions and checkpoints will be written.")
 
     ## Other parameters
+    parser.add_argument("--vocab_file", 
+                        default="", 
+                        type=str)
     parser.add_argument("--cache_dir",
                         default="",
                         type=str,
@@ -203,7 +206,12 @@ def main():
 
     if args.local_rank not in [-1, 0]:
         torch.distributed.barrier()  # Make sure only the first process in distributed training will download model & vocab
-    tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
+    
+    if args.vocab_file:
+        tokenizer = BertTokenizer(args.vocab_file, args.do_lower_case)
+    else:
+        tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
+    
     model = BertForSequenceClassification.from_pretrained(args.bert_model, num_labels=num_labels)
     if args.local_rank == 0:
         torch.distributed.barrier()
@@ -224,8 +232,8 @@ def main():
     tr_loss = 0
 
     if args.do_train:
-        if args.local_rank in [-1, 0]:
-            tb_writer = SummaryWriter()
+        # if args.local_rank in [-1, 0]:
+        #     tb_writer = SummaryWriter()
 
         # Prepare data loader
         train_examples = processor.get_train_examples(args.data_dir)
@@ -340,9 +348,9 @@ def main():
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
-                    if args.local_rank in [-1, 0]:
-                        tb_writer.add_scalar('lr', optimizer.get_lr()[0], global_step)
-                        tb_writer.add_scalar('loss', loss.item(), global_step)
+                    # if args.local_rank in [-1, 0]:
+                    #     tb_writer.add_scalar('lr', optimizer.get_lr()[0], global_step)
+                    #     tb_writer.add_scalar('loss', loss.item(), global_step)
 
     ### Saving best-practices: if you use defaults names for the model, you can reload it using from_pretrained()
     ### Example:
@@ -355,12 +363,15 @@ def main():
         output_config_file = os.path.join(args.output_dir, CONFIG_NAME)
 
         torch.save(model_to_save.state_dict(), output_model_file)
-        model_to_save.config.to_json_file(output_config_file)
-        tokenizer.save_vocabulary(args.output_dir)
+        with open(output_config_file, 'w') as f:
+            f.write(model_to_save.config.to_json_string())
+
+        # model_to_save.config.to_json_string(output_config_file)
+        # tokenizer.save_vocabulary(args.output_dir)
 
         # Load a trained model and vocabulary that you have fine-tuned
-        model = BertForSequenceClassification.from_pretrained(args.output_dir, num_labels=num_labels)
-        tokenizer = BertTokenizer.from_pretrained(args.output_dir, do_lower_case=args.do_lower_case)
+        # model = BertForSequenceClassification.from_pretrained(args.output_dir, num_labels=num_labels)
+        # tokenizer = BertTokenizer.from_pretrained(args.output_dir, do_lower_case=args.do_lower_case)
 
         # Good practice: save your training arguments together with the trained model
         output_args_file = os.path.join(args.output_dir, 'training_args.bin')

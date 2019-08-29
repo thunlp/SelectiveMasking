@@ -75,10 +75,10 @@ class DataProcessor(object):
         raise NotImplementedError()
 
     @classmethod
-    def _read_tsv(cls, input_file, quotechar=None):
+    def _read_tsv(cls, input_file, quotechar=None, delimiter="\t"):
         """Reads a tab separated value file."""
         with open(input_file, "r", encoding="utf-8") as f:
-            reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
+            reader = csv.reader(f, delimiter=delimiter, quotechar=quotechar)
             lines = []
             for line in reader:
                 if sys.version_info[0] == 2:
@@ -224,8 +224,29 @@ class Sst2Processor(DataProcessor):
 
 class YelpProcessor(DataProcessor):
     """Processor for the Yelp data set"""
-    def __init__(self, data_dir):
-        pass
+    def get_train_examples(self, data_dir):
+        """See base class"""
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "train.csv"), quotechar='"', delimiter=','), "train")
+
+    def get_dev_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "dev.csv"), quotechar='"', delimiter=','), "dev")
+
+    def get_labels(self):
+        """See base class."""
+        return ['1', '2', '3', '4', '5']
+
+    def _create_examples(self, lines, set_type):
+        """Creates examples for the training and dev sets."""
+        examples = []
+        for (i, line) in enumerate(lines):
+            guid = "%s-%s" % (set_type, i)
+            text_a = line[1]
+            label = line[0]
+            examples.append(InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+        return examples
+
         
 
 class StsbProcessor(DataProcessor):
@@ -547,6 +568,8 @@ def compute_metrics(task_name, preds, labels):
         return {"acc": simple_accuracy(preds, labels)}
     elif task_name == "wnli":
         return {"acc": simple_accuracy(preds, labels)}
+    elif task_name == "yelp":
+        return {"acc": simple_accuracy(preds, labels)}
     else:
         raise KeyError(task_name)
 
@@ -574,4 +597,5 @@ output_modes = {
     "qnli": "classification",
     "rte": "classification",
     "wnli": "classification",
+    "yelp": "classification"
 }
