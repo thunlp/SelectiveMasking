@@ -456,6 +456,7 @@ def main():
 
         eval_loss = eval_loss / nb_eval_steps
         preds = preds[0]
+        print(preds[0])
         if output_mode == "classification":
             preds = np.argmax(preds, axis=1)
         elif output_mode == "regression":

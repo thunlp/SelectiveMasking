@@ -2,9 +2,9 @@
 
 source $HOME/nvidia-bert/data/utils/config.sh
 
-INPUT_DIR=$HOME/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/
+INPUT_DIR=$HOME/nvidia-bert/data/yelp_amazon/tenk_yelp/
 OUTPUT_DIR=$HOME/nvidia-bert/data/yelp/hdf5_shards
-BERT_MODEL="bert-base-cased"
+BERT_MODEL=$HOME/nvidia-bert/yelp_out/
 mkdir -p ${OUTPUT_DIR}
 LOWER_CASE_SWITCH=""
 if [ "$DO_LOWER_CASE" = true ] ; then
@@ -12,7 +12,7 @@ if [ "$DO_LOWER_CASE" = true ] ; then
 fi
 # OUTPUT_FILE="${OUTPUT_DIR}/${SHARD_INDEX}.hdf5"
 echo "Bert model: ${BERT_MODEL}"
-python3 $HOME/nvidia-bert/create_pretraining_data.py \
+python3 $HOME/nvidia-bert/sc_cpd.py \
   --input_dir=${INPUT_DIR} \
   --output_dir=${OUTPUT_DIR} \
   --max_seq_length=${MAX_SEQUENCE_LENGTH} \

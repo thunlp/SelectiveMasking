@@ -142,89 +142,7 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
     f.flush()
     f.close()
 
-def tokenize(tokenizer, line):
-    words = line.strip().split(" ")
-    tokens = []
-    valid_positions = []
-    for i, word in enumerate(words):
-        token = tokenizer.tokenize(word)
-        tokens.extend(token)
-        for i in range(len(token)):
-            if i == 0:
-                valid_positions.append(1)
-            else:
-                valid_positions.append(0)
-    return tokens, valid_positions
-
-def create_better_mask(task_name, signi_indexes, tokens, valid_positions, masked_lm_prob, max_predictions_rate, vocab_words, rng):
-    """Creates the predictions for the masked LM objective."""
-    # NOTE this sequence is defined as the sequence after concatenation after devided by 2, the final mask number should be OK
-    max_predictions_sub_seq = len(tokens) * max_predictions_rate
-    cand_indexes = []
-    # save all word parts tokenized from a single word in a list
-    if task_name:
-        for index in signi_indexes:
-            if valid_positions[index] == 1:
-                cand_indexes.append([index])
-                i = index + 1
-                while i < len(valid_positions) and valid_positions[i] == 0:
-                    cand_indexes[-1].append(i)
-                    i += 1
-    else:
-        # using default strategy to choose mask positions
-        # randomly shuffle all indices
-        for (i, valid) in enumerate(valid_positions):
-            if valid == 1:
-                cand_indexes.append([i])
-            else:
-                cand_indexes[-1].append(i)
-        rng.shuffle(cand_indexes)
-    # output_tokens = list(tokens)
-
-    # NOTE changed to len(cand_indexes) * masked_lm_prob
-    # print(max_predictions_sub_seq, int(round(len(tokens) * masked_lm_prob)))
-    num_to_predict = min(int(max_predictions_sub_seq), max(1, int(round(len(tokens) * masked_lm_prob))))
-
-    masked_info = [{} for token in tokens] # if masked, masked symbol, else ""
-    masked_lms_len = 0
-    # covered_indexes = set()
-    for indexes in cand_indexes:
-        if masked_lms_len >= num_to_predict:
-            break
-        # if index in covered_indexes:
-        #   continue
-        # covered_indexes.add(index)
-
-        masked_tokens = None
-        # 80% of the time, replace with [MASK]
-        if rng.random() < 0.8:
-            masked_tokens = ["[MASK]" for index in indexes]
-        else:
-            # 10% of the time, keep original
-            if rng.random() < 0.5:
-                masked_tokens = [tokens[index] for index in indexes]
-            # 10% of the time, replace with random word
-            else:
-                masked_tokens = [vocab_words[rng.randint(0, len(vocab_words) - 1)] for index in indexes]
-
-        for (i, index) in enumerate(indexes):
-            masked_info[index]["mask"] = masked_tokens[i]
-            masked_info[index]["label"] = tokens[index]
-
-        masked_lms_len += len(indexes)
-
-        # masked_lms.extend([MaskedLmInstance(index=index, label=tokens[index]) for index in indexes])
-
-    # masked_lms = sorted(masked_lms, key=lambda x: x.index)
-
-    # masked_lm_positions = []
-    # masked_lm_labels = []
-    # for p in masked_lms:
-        # masked_lm_positions.append(p.index)
-        # masked_lm_labels.append(p.label)
-    return masked_info
-
-def create_training_instances(input_file, task_name, generator, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
+def create_training_instances(data, all_labels, task_name, generator, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
     """Create `TrainingInstance`s from raw text."""
 
     # Input file format:
@@ -233,13 +151,7 @@ def create_training_instances(input_file, task_name, generator, max_seq_length, 
     # sentence boundaries for the "next sentence prediction" task).
     # (2) Blank lines between documents. Document boundaries are needed so
     # that the "next sentence prediction" task doesn't span between documents.
-    print("creating instance from {}".format(input_file))
-    processor = processors[task_name]()
-    eval_examples = processor.get_dev_examples(input_file)
-    data = [example.text_a for example in eval_examples]
-    all_labels = [example.label for example in eval_examples]
-    label_list = processor.get_labels()
-    all_documents = generator(data, all_labels, label_list, rng)
+    all_documents = generator(data, all_labels, rng)
     # Remove empty documents
     all_documents = [x for x in all_documents if x]
     rng.shuffle(all_documents)
@@ -347,60 +259,8 @@ def create_instances_from_document(
         i += 1
     return instances
 
-
 MaskedLmInstance = collections.namedtuple("MaskedLmInstance", ["index", "label"])
 MaskedTokenInstance = collections.namedtuple("MaskedTokenInstance", ["tokens", "info"])
-
-def create_masked_lm_predictions(tokens, masked_lm_prob,
-                                 max_predictions_per_seq, vocab_words, rng):
-    """Creates the predictions for the masked LM objective."""
-
-    cand_indexes = []
-    for (i, token) in enumerate(tokens):
-        if token == "[CLS]" or token == "[SEP]":
-            continue
-        cand_indexes.append(i)
-
-    rng.shuffle(cand_indexes)
-
-    output_tokens = list(tokens)
-
-    num_to_predict = min(max_predictions_per_seq,
-                         max(1, int(round(len(tokens) * masked_lm_prob))))
-
-    masked_lms = []
-    # covered_indexes = set()
-    for index in cand_indexes:
-        if len(masked_lms) >= num_to_predict:
-          break
-        # if index in covered_indexes:
-        #   continue
-        # covered_indexes.add(index)
-
-        masked_token = None
-        # 80% of the time, replace with [MASK]
-        if rng.random() < 0.8:
-          masked_token = "[MASK]"
-        else:
-          # 10% of the time, keep original
-          if rng.random() < 0.5:
-            masked_token = tokens[index]
-          # 10% of the time, replace with random word
-          else:
-            masked_token = vocab_words[rng.randint(0, len(vocab_words) - 1)]
-
-        output_tokens[index] = masked_token
-
-        masked_lms.append(MaskedLmInstance(index=index, label=tokens[index]))
-
-    masked_lms = sorted(masked_lms, key=lambda x: x.index)
-
-    masked_lm_positions = []
-    masked_lm_labels = []
-    for p in masked_lms:
-        masked_lm_positions.append(p.index)
-        masked_lm_labels.append(p.label)
-    return (output_tokens, masked_lm_positions, masked_lm_labels)
 
 def truncate_seq_pair(tokens_a, m_info_a, tokens_b, m_info_b, max_num_tokens, rng):
     """Truncates a pair of sequences to a maximum sequence length."""
@@ -479,6 +339,15 @@ def main():
                         default=20,
                         type=int,
                         help="Maximum sequence length.")
+    parser.add_argument("--sentence_batch_size",
+                        default=8, 
+                        type=int)
+    parser.add_argument("--top_sen_rate",
+                        default=0.5,
+                        type=float)
+    parser.add_argument("--top_token_rate",
+                        default=0.2,
+                        type=float)
                              
 
     # floats
@@ -505,12 +374,26 @@ def main():
     print(args)
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
     random.seed(12)
-    generator = SC(args.masked_lm_prob, 0.1, 0.1, args.bert_model, False, args.max_seq_length, 32)
     rng = random.Random(args.random_seed)
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
+                        datefmt='%m/%d/%Y %H:%M:%S',
+                        level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
+    random.seed(args.random_seed)
+    np.random.seed(args.random_seed)
+    torch.manual_seed(args.random_seed)
 
+    print("creating instance from {}".format(args.input_dir))
+    processor = processors[args.task_name]()
+    eval_examples = processor.get_train_examples(args.input_dir)
+    data = [example.text_a for example in eval_examples]
+    all_labels = [example.label for example in eval_examples]
+    label_list = processor.get_labels()
+    logger.info("Bert Model: " + args.bert_model)
+    generator = SC(args.masked_lm_prob, args.top_sen_rate, args.top_token_rate, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
     # input_files = []
     instances = create_training_instances(
-        args.input_dir, args.task_name, generator, args.max_seq_length, args.dupe_factor,
+        data, all_labels, args.task_name, generator, args.max_seq_length, args.dupe_factor,
         args.short_seq_prob, args.masked_lm_prob, args.max_predictions_per_seq,
         rng)
         

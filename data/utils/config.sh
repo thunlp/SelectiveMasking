@@ -1,6 +1,6 @@
 #! /bin/bash
 
-set -e
+# set -e
 
 USE_BERT_LARGE=false
 MAX_SEQUENCE_LENGTH=512

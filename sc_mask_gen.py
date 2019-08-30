@@ -23,19 +23,23 @@ class InputFeatures(object):
         self.segment_ids = segment_ids
 
 class SC(nn.Module):
-    def __init__(self, mask_rate, top_sen_rate, top_token_rate, bert_model, do_lower_case, max_seq_length, sen_batch_size, use_gpu=True):
+    def __init__(self, mask_rate, top_sen_rate, top_token_rate, bert_model, do_lower_case, max_seq_length, label_list, sen_batch_size, use_gpu=True):
+        super(SC, self).__init__()
         self.mask_rate = mask_rate
         self.top_sen_rate = top_sen_rate
         self.top_token_rate = top_token_rate
+        self.label_list = label_list
         self.num_labels = len(self.label_list)
         self.max_seq_length = max_seq_length
         self.tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=do_lower_case)
         self.model = BertForSequenceClassification.from_pretrained(bert_model, num_labels=self.num_labels)
-        self.device = torch.device("cuda" if torch.cuda.is_available() and not use_gpu else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() and use_gpu else "cpu")
+        print(self.device)
+        self.model.to(self.device)
         self.n_gpu = torch.cuda.device_count()
         self.sen_batch_size = sen_batch_size
         self.vocab = list(self.tokenizer.vocab.keys())
-        if (self.n_gpu > 1):
+        if self.n_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
 
     def convert_examples_to_features(self, data):
@@ -65,6 +69,7 @@ class SC(nn.Module):
         return features
 
     def evaluate(self, data, batch_size):
+        # print(data)
         eval_features = self.convert_examples_to_features(data)
         all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
@@ -113,11 +118,11 @@ class SC(nn.Module):
         return masked_info
         
 
-    def forward(self, data, all_labels, label_list, rng):
+    def forward(self, data, all_labels, rng):
         # data: not tokenized
         # convert label to ids
         doc_num = len(data)
-        label_map = {label : i for i, label in enumerate(label_list)}
+        label_map = {label : i for i, label in enumerate(self.label_list)}
         all_label_ids = [label_map[label] for label in all_labels]
         
         # convert data, segment data to sentences
@@ -126,13 +131,14 @@ class SC(nn.Module):
         sentencizer = nlp.create_pipe("sentencizer")
         nlp.add_pipe(sentencizer)
         sentences = []
-        sen_doc_id = [] # [0, 0, ..., 0, 1, 1, ..., 1, ...]
+        sen_doc_ids = [] # [0, 0, ..., 0, 1, 1, ..., 1, ...]
         # which_select = []
         for (doc_id, doc) in enumerate(data):
             tokenized_data.append(self.tokenizer.tokenize(doc))
-            sens = nlp(doc)
-            sentences.extend([self.tokenizer.tokenize(sen) for sen in sens])
-            sen_doc_id.extend([doc_id] * len(sens))
+            doc = nlp(doc)
+            tL = [self.tokenizer.tokenize(sen.text) for sen in doc.sents]
+            sentences.extend(tL)
+            sen_doc_ids.extend([doc_id] * len(tL))
             # which_select.extend([False] * len(sens))
         
         # logger.info("Begin eval for all doc")
@@ -147,7 +153,7 @@ class SC(nn.Module):
         i = 0
         for doc_id in range(doc_num):
             ds = []
-            while sen_doc_id[i] == doc_id:
+            while i < len(sen_doc_ids) and sen_doc_ids[i] == doc_id:
                 sen_pred = sens_preds[i]
                 doc_ground_truth = all_label_ids[doc_id]
                 # compare with ground truth
@@ -156,8 +162,9 @@ class SC(nn.Module):
                     ds.append((sentences[i], doc_id, i, sen_pred, sens_pred_scores[i][doc_ground_truth]))
                     # which_select[i] = True
                 i += 1
-            ds = sorted(ds, key=lambda x: x[-1], reverse=True) # sort by score
-            t_sen, t_sen_doc_id, t_sen_doc_pos, t_pred, t_score = zip(*ds[0:int(self.top_sen_rate * len(ds))])  # select top sentences
+            if len(ds) == 0:
+                continue
+            t_sen, t_sen_doc_id, t_sen_doc_pos, t_pred, t_score = zip(*ds[0:max(int(self.top_sen_rate * len(ds)), 1)])  # select top sentences
             right_sens.extend(t_sen)
             right_preds.extend(t_pred)
             right_scores.extend(t_score)
@@ -181,22 +188,24 @@ class SC(nn.Module):
             st = []
             origin_score = right_scores[sen_id]
             sen_doc_pos = right_sen_doc_poses[sen_id]
-            while mask_sen_doc_poses[i] == sen_doc_pos:
-                c = origin_score - mask_sens_scores[i]
+            doc_ground_truth = all_label_ids[sen_doc_ids[sen_doc_pos]]
+            while i < len(mask_sen_doc_poses) and mask_sen_doc_poses[i] == sen_doc_pos:
+                c = origin_score - mask_sens_scores[i][doc_ground_truth]
                 # (masked_pos, score)
-                st.append(masked_poses[i], c)
+                st.append((masked_poses[i], c))
                 i += 1
             st = sorted(st, key=lambda x: x[-1], reverse=True)
-            mask_pos_d[sen_doc_pos] = zip(*st)[0]
+            mask_pos_d[sen_doc_pos], _ = zip(*st)
         
         all_documents = []
         i = 0
-        for doc_id in range(doc_num):
+        for doc_id in tqdm(range(doc_num), desc="Generating All Documents"):
             all_documents.append([])
-            while doc_id == sen_doc_id[i]:
+            while i < len(sen_doc_ids) and doc_id == sen_doc_ids[i]:
                 m_info = []
                 if i in mask_pos_d:
-                    m_info = self.create_mask(mask_pos_d[i], rng)
-                all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], m_info=m_info))
+                    m_info = self.create_mask(mask_pos_d[i], sentences[i], rng)
+                all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
+                i += 1
 
         return all_documents
