@@ -219,31 +219,6 @@ class Ner(MaskGenerator):
             for pos in masked_data["pos"]:
                 pos_signi[pos] += diff_words_num
 
-        # for masked_data in masked_datas:
-        #     # print(masked_data['pos'])
-        #     try:
-        #         masked_prediction = self.evaluate(masked_data['data'])
-        #     except ValueError:
-        #         print(masked_datas)
-        #         raise ValueError
-        #     diff_words_num = 0
-        #     # print(prediction)
-        #     # print(masked_prediction)
-        #     index_masked = 0
-        #     for index in range(len(prediction)):
-        #         if index not in masked_data['pos']:
-        #             assert prediction[index][0] == masked_prediction[index_masked][0]
-        #             if prediction[index][1] != masked_prediction[index_masked][1]:
-        #                 diff_words_num += 1
-        #             index_masked += 1
-            # if diff_words_num > 0:
-                # print(self.D[data['words'][masked_data['pos'][0]]])
-                # print([item[1] for item in prediction])
-                # print([item[1] for item in masked_prediction])
-        #    for pos in masked_data["pos"]:
-        #        pos_signi[pos] += diff_words_num
-        # print([self.D[w] for w in data["words"]])
-        # print(pos_signi)
         L = []
         for i in range(len(pos_signi)):
             if pos_signi[i] > 0:
