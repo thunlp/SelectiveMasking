@@ -373,13 +373,11 @@ def main():
     args = parser.parse_args()
     print(args)
     tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
-    random.seed(12)
-    rng = random.Random(args.random_seed)
     logger = logging.getLogger(__name__)
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                         datefmt='%m/%d/%Y %H:%M:%S',
                         level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN)
-    random.seed(args.random_seed)
+    rng = random.Random(args.random_seed)
     np.random.seed(args.random_seed)
     torch.manual_seed(args.random_seed)
 

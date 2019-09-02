@@ -8,12 +8,14 @@ from spacy.lang.en import English
 from tqdm import tqdm
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, TensorDataset)
 from torch.utils.data.distributed import DistributedSampler
+from torch.nn.functional import softmax
 
 from modeling import BertForSequenceClassification
 from tokenization import BertTokenizer
 
 logger = logging.getLogger(__name__)
 MaskedTokenInstance = collections.namedtuple("MaskedTokenInstance", ["tokens", "info"])
+MaskedItemInfo = collections.namedtuple("MaskedItemInfo", ["current_pos", "sen_doc_pos", "sen_right_id", "doc_ground_truth"])
 
 
 class InputFeatures(object):
@@ -87,6 +89,7 @@ class SC(nn.Module):
             segment_ids = segment_ids.to(self.device)
             with torch.no_grad():
                 logits = self.model(input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
+                logits = softmax(logits, dim=1)
             if len(preds) == 0:
                 preds.append(logits.detach().cpu().numpy())
             else:
@@ -100,7 +103,8 @@ class SC(nn.Module):
         masked_poses = []
         for i in range(len(sen)):
             masked_poses.append(i)
-            masked_sentences.append([sen[j] for j in range(len(sen)) if j != i])
+            masked_sentences.append(sen[0:i + 1])
+            # masked_sentences.append([sen[j] for j in range(len(sen)) if j != i])
         return masked_sentences, masked_poses
 
     def create_mask(self, mask_poses, sen, rng):
@@ -140,11 +144,14 @@ class SC(nn.Module):
             sentences.extend(tL)
             sen_doc_ids.extend([doc_id] * len(tL))
             # which_select.extend([False] * len(sens))
-        
-        # logger.info("Begin eval for all doc")
-        # doc_preds, _ = self.evaluate(tokenized_data, self.doc_batch_size)
+        # print(data)
+        # print(all_label_ids)
+        # print(sentences)
+        # print(sen_doc_ids)
         logger.info("Begin eval for all sentence")
         sens_preds, sens_pred_scores = self.evaluate(sentences, self.sen_batch_size)
+        # print(sens_preds)
+        # print(sens_pred_scores)
         right_sens = []
         right_preds = []
         right_scores = []
@@ -164,6 +171,7 @@ class SC(nn.Module):
                 i += 1
             if len(ds) == 0:
                 continue
+            ds = sorted(ds, key=lambda x : x[-1], reverse=True)
             t_sen, t_sen_doc_id, t_sen_doc_pos, t_pred, t_score = zip(*ds[0:max(int(self.top_sen_rate * len(ds)), 1)])  # select top sentences
             right_sens.extend(t_sen)
             right_preds.extend(t_pred)
@@ -171,40 +179,91 @@ class SC(nn.Module):
             right_sen_doc_ids.extend(t_sen_doc_id)
             right_sen_doc_poses.extend(t_sen_doc_pos)
         
-        right_sens_num = len(right_sens)
-        masked_sens = []
-        masked_poses = []
-        mask_sen_doc_poses = []
-        for sen_doc_pos, sen in zip(right_sen_doc_poses, right_sens):
-            masked_sen, masked_pos = self.mask_token(sen)
-            masked_sens.extend(masked_sen)
-            masked_poses.extend(masked_pos)
-            mask_sen_doc_poses.extend([sen_doc_pos] * len(masked_sen))
+        # print(right_sens)
+        # print(right_preds)
+        # print(right_scores)
+        # print(right_sen_doc_ids)
+        # print(right_sen_doc_poses)
 
-        mask_sens_preds, mask_sens_scores = self.evaluate(masked_sens, self.sen_batch_size)
-        i = 0
-        mask_pos_d = {}
-        for sen_id in range(right_sens_num):
-            st = []
-            origin_score = right_scores[sen_id]
-            sen_doc_pos = right_sen_doc_poses[sen_id]
-            doc_ground_truth = all_label_ids[sen_doc_ids[sen_doc_pos]]
-            while i < len(mask_sen_doc_poses) and mask_sen_doc_poses[i] == sen_doc_pos:
-                c = origin_score - mask_sens_scores[i][doc_ground_truth]
-                # (masked_pos, score)
-                st.append((masked_poses[i], c))
-                i += 1
-            st = sorted(st, key=lambda x: x[-1], reverse=True)
-            mask_pos_d[sen_doc_pos], _ = zip(*st)
+        right_sens_num = len(right_sens)
+        # convert right sentence to reverse
+
+        masked_sens =[]
+        masked_item_infos = []
         
+
+        threshold = 0.1
+        # init
+        for sen_right_id, (sen_doc_pos, sen) in enumerate(zip(right_sen_doc_poses, right_sens)):
+            masked_sens.append(sen[0:1])
+            masked_item_infos.append({"sen_doc_pos": sen_doc_pos, "sen_right_id": sen_right_id, "doc_ground_truth": all_label_ids[sen_doc_ids[sen_doc_pos]]})
+
+        mask_poses_d = {}
+        mask_pos = 0
+        while len(masked_sens) != 0:
+            # print(mask_pos)
+            # print(masked_sens)
+            _, mask_sens_scores = self.evaluate(masked_sens, self.sen_batch_size)
+            masked_sens_num = len(masked_sens)
+            temp_masked_sens = []
+            temp_masked_item_infos = []
+            for masked_sen, masked_item_info, mask_sens_score in zip(masked_sens, masked_item_infos, mask_sens_scores):
+                # print(mask_sens_score)
+                sen_doc_pos = masked_item_info["sen_doc_pos"]
+                doc_ground_truth = masked_item_info["doc_ground_truth"]
+                sen_right_id = masked_item_info["sen_right_id"]
+                origin_score = right_scores[sen_right_id]
+                if origin_score - mask_sens_score[doc_ground_truth] < threshold:
+                    # choose as mask
+                    if sen_doc_pos in mask_poses_d:
+                        mask_poses_d[sen_doc_pos].append(mask_pos)
+                    else:
+                        mask_poses_d[sen_doc_pos] = [mask_pos]
+                    masked_sen.pop()
+                
+                if mask_pos + 1 < len(right_sens[sen_right_id]):
+                    masked_sen.append(right_sens[sen_right_id][mask_pos + 1])
+                    temp_masked_sens.append(masked_sen)
+                    temp_masked_item_infos.append(masked_item_info)
+                
+                masked_sens = temp_masked_sens
+                masked_item_infos = temp_masked_item_infos
+            mask_pos += 1       
+
+        # print("-" * 100)
+
+        # mask_sens_preds, mask_sens_scores = self.evaluate(masked_sens, self.sen_batch_size)
+        # i = 0
+        # mask_pos_d = {}
+        # for sen_id in range(right_sens_num):
+        #     st = []
+        #     origin_score = right_scores[sen_id]
+        #     sen_doc_pos = right_sen_doc_poses[sen_id]
+        #     doc_ground_truth = all_label_ids[sen_doc_ids[sen_doc_pos]]
+        #     print("Ground truth", doc_ground_truth)
+        #     print("origin", origin_score)
+        #     while i < len(mask_sen_doc_poses) and mask_sen_doc_poses[i] == sen_doc_pos:
+        #         c = origin_score - mask_sens_scores[i][doc_ground_truth]
+        #         print(mask_sens_scores[i], sentences[sen_doc_pos][masked_poses[i]])
+        #         # (masked_pos, score)
+        #         st.append((masked_poses[i], c))
+        #         i += 1
+        #     st = sorted(st, key=lambda x: x[-1], reverse=True)
+        #     st = st[0:max(int(self.top_token_rate * len(st)), 1)]
+        #     mask_pos_d[sen_doc_pos], _ = zip(*st)
+        print(mask_poses_d)
+        for key, value in mask_poses_d.items():
+            print([sentences[key][pos] for pos in mask_poses_d[key]])
         all_documents = []
         i = 0
         for doc_id in tqdm(range(doc_num), desc="Generating All Documents"):
             all_documents.append([])
             while i < len(sen_doc_ids) and doc_id == sen_doc_ids[i]:
                 m_info = []
-                if i in mask_pos_d:
-                    m_info = self.create_mask(mask_pos_d[i], sentences[i], rng)
+                if i in mask_poses_d:
+                    m_info = self.create_mask(mask_poses_d[i], sentences[i], rng)
+                    print(sentences[i])
+                    print(m_info)
                 all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
                 i += 1
 
