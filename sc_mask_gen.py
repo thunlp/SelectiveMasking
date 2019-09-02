@@ -25,26 +25,27 @@ class InputFeatures(object):
         self.segment_ids = segment_ids
 
 class SC(nn.Module):
-    def __init__(self, mask_rate, top_sen_rate, top_token_rate, bert_model, do_lower_case, max_seq_length, label_list, sen_batch_size, use_gpu=True):
+    def __init__(self, mask_rate, top_sen_rate, threshold, bert_model, do_lower_case, max_seq_length, label_list, sen_batch_size, use_gpu=True):
         super(SC, self).__init__()
-        self.mask_rate = mask_rate
-        self.top_sen_rate = top_sen_rate
-        self.top_token_rate = top_token_rate
-        self.label_list = label_list
+        self.mask_rate = mask_rate # bert 里面的mask_rate，现在没有用
+        self.top_sen_rate = top_sen_rate # 每段话按句子评分排序后取前百分之多少
+        self.threshold = threshold # 选词的那个threshold
+        self.label_list = label_list # 所有的label : ["1", "2", "3", "4", "5"]
         self.num_labels = len(self.label_list)
-        self.max_seq_length = max_seq_length
+        self.max_seq_length = max_seq_length # bert里面的max_seq_length
         self.tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=do_lower_case)
         self.model = BertForSequenceClassification.from_pretrained(bert_model, num_labels=self.num_labels)
         self.device = torch.device("cuda" if torch.cuda.is_available() and use_gpu else "cpu")
         print(self.device)
         self.model.to(self.device)
         self.n_gpu = torch.cuda.device_count()
-        self.sen_batch_size = sen_batch_size
+        self.sen_batch_size = sen_batch_size # 给sentence 分类的时候的batch_size
         self.vocab = list(self.tokenizer.vocab.keys())
         if self.n_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
 
     def convert_examples_to_features(self, data):
+        # 原来create pretraining data 里面的convert_examples_to_features函数
         features = []
         for (ex_index, tokens_a) in enumerate(data):
             if ex_index % 10000 == 0:
@@ -71,7 +72,7 @@ class SC(nn.Module):
         return features
 
     def evaluate(self, data, batch_size):
-        # print(data)
+        # 给一堆句子评分，返回所有句子的分类结果和所有句子五个类的评分
         eval_features = self.convert_examples_to_features(data)
         all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
@@ -98,16 +99,17 @@ class SC(nn.Module):
         preds_arg = np.argmax(preds[0], axis=1)
         return preds_arg, preds[0]
 
-    def mask_token(self, sen):
-        masked_sentences = []
-        masked_poses = []
-        for i in range(len(sen)):
-            masked_poses.append(i)
-            masked_sentences.append(sen[0:i + 1])
-            # masked_sentences.append([sen[j] for j in range(len(sen)) if j != i])
-        return masked_sentences, masked_poses
+    # def mask_token(self, sen):
+    #     masked_sentences = []
+    #     masked_poses = []
+    #     for i in range(len(sen)):
+    #         masked_poses.append(i)
+    #         masked_sentences.append(sen[0:i + 1])
+    #         # masked_sentences.append([sen[j] for j in range(len(sen)) if j != i])
+    #     return masked_sentences, masked_poses
 
     def create_mask(self, mask_poses, sen, rng):
+        # 根据需要mask的位置生成mask
         masked_info = [{} for token in sen]
         for pos in mask_poses:
             if rng.random() < 0.8:
@@ -123,6 +125,7 @@ class SC(nn.Module):
         
 
     def forward(self, data, all_labels, rng):
+        # 输入没有tokenized 的段，和每段对应的分类结果
         # data: not tokenized
         # convert label to ids
         doc_num = len(data)
@@ -135,15 +138,14 @@ class SC(nn.Module):
         sentencizer = nlp.create_pipe("sentencizer")
         nlp.add_pipe(sentencizer)
         sentences = []
-        sen_doc_ids = [] # [0, 0, ..., 0, 1, 1, ..., 1, ...]
-        # which_select = []
+        sen_doc_ids = [] # [0, 0, ..., 0, 1, 1, ..., 1, ...] 每个句子对应原来段的id
         for (doc_id, doc) in enumerate(data):
             tokenized_data.append(self.tokenizer.tokenize(doc))
             doc = nlp(doc)
             tL = [self.tokenizer.tokenize(sen.text) for sen in doc.sents]
             sentences.extend(tL)
             sen_doc_ids.extend([doc_id] * len(tL))
-            # which_select.extend([False] * len(sens))
+
         # print(data)
         # print(all_label_ids)
         # print(sentences)
@@ -152,11 +154,13 @@ class SC(nn.Module):
         sens_preds, sens_pred_scores = self.evaluate(sentences, self.sen_batch_size)
         # print(sens_preds)
         # print(sens_pred_scores)
-        right_sens = []
-        right_preds = []
-        right_scores = []
-        right_sen_doc_ids = []
-        right_sen_doc_poses = []
+
+        # 所有分类正确的句子的信息
+        right_sens = [] # 分类正确的句子
+        right_preds = [] # 分类正确句子对应的分类结果
+        right_scores = [] # 分类正确的句子的分数
+        right_sen_doc_ids = [] # 分类正确的句子属于的那个段的id
+        right_sen_doc_poses = [] # 分类正确的句子在sentences中的位置
         i = 0
         for doc_id in range(doc_num):
             ds = []
@@ -165,9 +169,8 @@ class SC(nn.Module):
                 doc_ground_truth = all_label_ids[doc_id]
                 # compare with ground truth
                 if doc_ground_truth == sen_pred:
-                    # (sentence, doc_id, sen_doc_pos, pred, score of ground truth)
+                    # 每个tuple: (sentence, doc_id, sen_doc_pos, pred, score of ground truth)
                     ds.append((sentences[i], doc_id, i, sen_pred, sens_pred_scores[i][doc_ground_truth]))
-                    # which_select[i] = True
                 i += 1
             if len(ds) == 0:
                 continue
@@ -188,18 +191,18 @@ class SC(nn.Module):
         right_sens_num = len(right_sens)
         # convert right sentence to reverse
 
-        masked_sens =[]
-        masked_item_infos = []
+        masked_sens = [] # 所有mask的句子
+        masked_item_infos = [] # 每个句子的一些其他信息
         
-
-        threshold = 0.1
         # init
         for sen_right_id, (sen_doc_pos, sen) in enumerate(zip(right_sen_doc_poses, right_sens)):
-            masked_sens.append(sen[0:1])
+            masked_sens.append(sen[0:1]) # 一开始每个句子长度是1
+            # 每个info结构：sen_doc_pos: 原来的句子在sentences里面的位置，sen_right_id: 原来的句子在right_sens里面的位置，doc_ground_truth: 分类结果的ground truth
             masked_item_infos.append({"sen_doc_pos": sen_doc_pos, "sen_right_id": sen_right_id, "doc_ground_truth": all_label_ids[sen_doc_ids[sen_doc_pos]]})
 
-        mask_poses_d = {}
-        mask_pos = 0
+        mask_poses_d = {} # 所有mask位置，key: 句子在sentences中的位置，value: 句子选出来的mask位置
+        mask_pos = 0 # 正在测试mask的词的位置，每一轮之后加1
+        # 每一轮循环过后，masked_sens里面的句子长度会加一（上一个词没有被选中，并加入了下一个词），或者不变（上一个词被选中了，并加入了下一个词），句子个数逐渐变少
         while len(masked_sens) != 0:
             # print(mask_pos)
             # print(masked_sens)
@@ -212,8 +215,8 @@ class SC(nn.Module):
                 sen_doc_pos = masked_item_info["sen_doc_pos"]
                 doc_ground_truth = masked_item_info["doc_ground_truth"]
                 sen_right_id = masked_item_info["sen_right_id"]
-                origin_score = right_scores[sen_right_id]
-                if origin_score - mask_sens_score[doc_ground_truth] < threshold:
+                origin_score = right_scores[sen_right_id] # 原句的分
+                if origin_score - mask_sens_score[doc_ground_truth] < self.threshold:
                     # choose as mask
                     if sen_doc_pos in mask_poses_d:
                         mask_poses_d[sen_doc_pos].append(mask_pos)
@@ -221,6 +224,7 @@ class SC(nn.Module):
                         mask_poses_d[sen_doc_pos] = [mask_pos]
                     masked_sen.pop()
                 
+                # 加入下一个词
                 if mask_pos + 1 < len(right_sens[sen_right_id]):
                     masked_sen.append(right_sens[sen_right_id][mask_pos + 1])
                     temp_masked_sens.append(masked_sen)
@@ -232,6 +236,7 @@ class SC(nn.Module):
 
         # print("-" * 100)
 
+        # 原来直接删掉一个词，评分相减的策略
         # mask_sens_preds, mask_sens_scores = self.evaluate(masked_sens, self.sen_batch_size)
         # i = 0
         # mask_pos_d = {}
@@ -251,20 +256,24 @@ class SC(nn.Module):
         #     st = sorted(st, key=lambda x: x[-1], reverse=True)
         #     st = st[0:max(int(self.top_token_rate * len(st)), 1)]
         #     mask_pos_d[sen_doc_pos], _ = zip(*st)
+        
         print(mask_poses_d)
         for key, value in mask_poses_d.items():
             print([sentences[key][pos] for pos in mask_poses_d[key]])
         all_documents = []
+
+        # 生成带有mask信息的document
+        # all_document = [[m_info0（每个句子的mask信息）, m_info1,... ]（第一段）, [...]（第二段）, ...]
         i = 0
         for doc_id in tqdm(range(doc_num), desc="Generating All Documents"):
             all_documents.append([])
             while i < len(sen_doc_ids) and doc_id == sen_doc_ids[i]:
-                m_info = []
+                mask_poses = []
                 if i in mask_poses_d:
-                    m_info = self.create_mask(mask_poses_d[i], sentences[i], rng)
-                    print(sentences[i])
-                    print(m_info)
+                    mask_poses = mask_poses_d[i]
+                m_info = self.create_mask(mask_poses, sentences[i], rng)
                 all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
                 i += 1
+            # print(all_documents[-1])
 
         return all_documents

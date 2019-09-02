@@ -5,6 +5,8 @@ source $HOME/nvidia-bert/data/utils/config.sh
 INPUT_DIR=$HOME/nvidia-bert/data/yelp_amazon/tenk_yelp/
 OUTPUT_DIR=$HOME/nvidia-bert/data/yelp/hdf5_shards
 BERT_MODEL=$HOME/nvidia-bert/yelp_out/
+TOP_SEN_RATE=0.8
+THRESHOLD=0.2
 mkdir -p ${OUTPUT_DIR}
 LOWER_CASE_SWITCH=""
 if [ "$DO_LOWER_CASE" = true ] ; then
@@ -23,4 +25,6 @@ python3 $HOME/nvidia-bert/sc_cpd.py \
   --bert_model=${BERT_MODEL} \
   --task_name="yelp" \
   --gpus=${N_PROCS_PREPROCESS} \
+  --top_sen_rate=${TOP_SEN_RATE} \
+  --threshold=${THRESHOLD} \
   ${LOWER_CASE_SWITCH} 

@@ -145,12 +145,6 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
 def create_training_instances(data, all_labels, task_name, generator, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
     """Create `TrainingInstance`s from raw text."""
 
-    # Input file format:
-    # (1) One sentence per line. These should ideally be actual sentences, not
-    # entire paragraphs or arbitrary spans of text. (Because we use the
-    # sentence boundaries for the "next sentence prediction" task).
-    # (2) Blank lines between documents. Document boundaries are needed so
-    # that the "next sentence prediction" task doesn't span between documents.
     all_documents = generator(data, all_labels, rng)
     # Remove empty documents
     all_documents = [x for x in all_documents if x]
@@ -343,9 +337,9 @@ def main():
                         default=8, 
                         type=int)
     parser.add_argument("--top_sen_rate",
-                        default=0.5,
+                        default=0.8,
                         type=float)
-    parser.add_argument("--top_token_rate",
+    parser.add_argument("--threshold",
                         default=0.2,
                         type=float)
                              
@@ -388,7 +382,7 @@ def main():
     all_labels = [example.label for example in eval_examples]
     label_list = processor.get_labels()
     logger.info("Bert Model: " + args.bert_model)
-    generator = SC(args.masked_lm_prob, args.top_sen_rate, args.top_token_rate, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
+    generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
     # input_files = []
     instances = create_training_instances(
         data, all_labels, args.task_name, generator, args.max_seq_length, args.dupe_factor,
