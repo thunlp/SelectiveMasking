@@ -27,4 +27,5 @@ python3 $HOME/nvidia-bert/sc_cpd.py \
   --gpus=${N_PROCS_PREPROCESS} \
   --top_sen_rate=${TOP_SEN_RATE} \
   --threshold=${THRESHOLD} \
+  --rand_gen \
   ${LOWER_CASE_SWITCH} 

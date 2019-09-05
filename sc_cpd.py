@@ -34,6 +34,7 @@ import collections
 import mask_utils.mask_generators as mask_generators
 from run_classifier_dataset_utils import processors
 from sc_mask_gen import SC
+from rand_mask_gen import RandMask
 
 
 
@@ -293,6 +294,10 @@ def main():
 
     ## Other parameters
 
+    # bool
+    parser.add_argument("--rand_gen", 
+                        action="store_true")
+
     # str
     parser.add_argument("--bert_model", 
                         default="bert-large-uncased", 
@@ -303,14 +308,7 @@ def main():
     parser.add_argument("--task_name", 
                         default="", 
                         type=str,
-                        required=False,
-                        help="Use specific task to generate better mask. If does not specify a task, "
-                                "mask will be randomly chose as original version")
-    parser.add_argument("--downstream_config", 
-                        default="",
-                        type=str,
-                        required=False,
-                        help="Downstream model configure json file")
+                        required=False)
     parser.add_argument("--gpus", 
                         default=0,
                         type=int)
@@ -326,7 +324,7 @@ def main():
                              "Sequences longer than this will be truncated, and sequences shorter \n"
                              "than this will be padded.")
     parser.add_argument("--dupe_factor",
-                        default=10,
+                        default=1,
                         type=int,
                         help="Number of times to duplicate the input data (with different masks).")
     parser.add_argument("--max_predictions_per_seq",
@@ -382,7 +380,10 @@ def main():
     all_labels = [example.label for example in eval_examples]
     label_list = processor.get_labels()
     logger.info("Bert Model: " + args.bert_model)
-    generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
+    if args.rand_gen:
+        generator = RandMask(args.masked_lm_prob, args.bert_model, args.do_lower_case, args.max_seq_length)
+    else:    
+        generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
     # input_files = []
     instances = create_training_instances(
         data, all_labels, args.task_name, generator, args.max_seq_length, args.dupe_factor,
