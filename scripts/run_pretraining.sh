@@ -16,13 +16,13 @@ seed=${12:-42}
 job_name=${13:-"job"}
 
 
-DATASET=wiki_1g_uncased # change this for other datasets
+DATASET=yelp # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
-BERT_CONFIG=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
-LOAD_MODEL=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
-RESULTS_DIR=${HOME}/nvidia-bert/uncased_test_2
-CHECKPOINTS_DIR=${HOME}/nvidia-bert/uncased_test_2/checkpoints
+BERT_CONFIG=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
+LOAD_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
+RESULTS_DIR=/data1/private/zzy/Dynamic-Bert/yelp_first
+CHECKPOINTS_DIR=/data1/private/zzy/Dynamic-Bert/yelp_first/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 
@@ -66,14 +66,14 @@ fi
 
 echo $DATA_DIR
 INPUT_DIR=$DATA_DIR
-CMD=" /home/gyx/nvidia-bert/run_pretraining.py"
+CMD=" /data1/private/zzy/Dynamic-Bert/run_pretraining.py"
 CMD+=" --input_dir=$DATA_DIR"
 CMD+=" --output_dir=$CHECKPOINTS_DIR"
 CMD+=" --config_file=$BERT_CONFIG"
 CMD+=" --load=$LOAD_MODEL"
 CMD+=" --bert_model=bert-base-uncased"
 CMD+=" --train_batch_size=$train_batch_size"
-CMD+=" --max_seq_length=512"
+CMD+=" --max_seq_length=256"
 CMD+=" --max_predictions_per_seq=80"
 CMD+=" --max_steps=$train_steps"
 CMD+=" --warmup_proportion=$warmup_proportion"

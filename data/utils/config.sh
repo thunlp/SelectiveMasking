@@ -3,12 +3,12 @@
 # set -e
 
 USE_BERT_LARGE=false
-MAX_SEQUENCE_LENGTH=512
+MAX_SEQUENCE_LENGTH=256
 MAX_PREDICTIONS_PER_SEQUENCE=80
 MASKED_LM_PROB=0.15
 SEED=12345
 DUPE_FACTOR=1
-DO_LOWER_CASE=false
+DO_LOWER_CASE=true
 N_LINES_PER_SHARD_APPROX=99000   # Default=396000 creates 256 shards
 
 N_PROCS_PREPROCESS=56    # Adjust this based on memory requirements and available number of cores

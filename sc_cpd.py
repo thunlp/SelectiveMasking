@@ -363,6 +363,9 @@ def main():
                         type=int,
                         default=12345,
                         help="random seed for initialization")
+    parser.add_argument('--part',
+                        type=int,
+                        default=0)
 
     args = parser.parse_args()
     print(args)
@@ -377,19 +380,20 @@ def main():
 
     print("creating instance from {}".format(args.input_dir))
     processor = processors[args.task_name]()
-    eval_examples = processor.get_train_examples(args.input_dir)
+    eval_examples = processor.get_pretrain_examples(args.input_dir, args.part)
+    print(len(eval_examples))
     data = [example.text_a for example in eval_examples]
     all_labels = [example.label for example in eval_examples]
     label_list = processor.get_labels()
     logger.info("Bert Model: " + args.bert_model)
-    generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
+    generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length // 2, label_list, args.sentence_batch_size)
     # input_files = []
     instances = create_training_instances(
         data, all_labels, args.task_name, generator, args.max_seq_length, args.dupe_factor,
         args.short_seq_prob, args.masked_lm_prob, args.max_predictions_per_seq,
         rng)
         
-    output_file = os.path.join(args.output_dir, "0.hdf5")        
+    output_file = os.path.join(args.output_dir, "{}.hdf5".format(args.part))        
     write_instance_to_example_file(instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, output_file)
     
 
