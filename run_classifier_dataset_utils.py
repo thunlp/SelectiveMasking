@@ -229,6 +229,27 @@ class YelpProcessor(DataProcessor):
         return self._create_examples(
             self._read_tsv(os.path.join(data_dir, "train.csv"), quotechar='"', delimiter=','), "train")
 
+    def get_pretrain_examples(self, data_dir, part):
+        """See base class"""
+        lines = self._read_tsv(os.path.join(data_dir, "train.csv"), quotechar='"', delimiter=',')
+        data_size = len(lines)
+        part_size = data_size // 8
+        begin = part*part_size
+        end = (part+1)*part_size
+        print(begin, end)
+        if end - begin < 1000:
+            begin = 0
+            end = data_size
+        if part == 7:
+            end = data_size
+        examples = []
+        for i, line in enumerate(lines[begin:end]):
+            label = line[0]
+            text_a = line[1]
+            examples.append(InputExample(guid=i, text_a=text_a, text_b=None, label=label))
+        return examples
+
+
     def get_dev_examples(self, data_dir):
         """See base class."""
         return self._create_examples(self._read_tsv(os.path.join(data_dir, "dev.csv"), quotechar='"', delimiter=','), "dev")
@@ -239,13 +260,29 @@ class YelpProcessor(DataProcessor):
 
     def _create_examples(self, lines, set_type):
         """Creates examples for the training and dev sets."""
-        examples = []
+        from collections import defaultdict
+        import random
+        examples = defaultdict(list)
+        random.seed(888)
+        random.shuffle(lines)
         for (i, line) in enumerate(lines):
             guid = "%s-%s" % (set_type, i)
             text_a = line[1]
             label = line[0]
-            examples.append(InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
-        return examples
+            examples[label].append(InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+        # 500 for each
+        if set_type != "dev":
+            examples_ = []
+            for k, v in examples.items():
+                examples_.extend(v[:500])
+            random.seed(888)
+            random.shuffle(examples_)
+            return examples_
+        else:
+            examples_ = []
+            for k, v in examples.items():
+                examples_.extend(v)
+            return examples_
 
         
 
