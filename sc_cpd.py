@@ -146,12 +146,13 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
 def create_training_instances(data, all_labels, task_name, generator, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
     """Create `TrainingInstance`s from raw text."""
 
-    all_documents = generator(data, all_labels, rng)
-    # Remove empty documents
-    all_documents = [x for x in all_documents if x]
-    rng.shuffle(all_documents)
     instances = []
+    # Remove empty documents
     for _ in range(dupe_factor):
+        all_documents = generator(data, all_labels, rng)
+        all_documents = [x for x in all_documents if x]
+        print(len(all_documents))
+        rng.shuffle(all_documents)
         for document_index in range(len(all_documents)):
             instances.extend(create_instances_from_document(all_documents, document_index, max_seq_length, short_seq_prob,
                 masked_lm_prob, max_predictions_per_seq, rng))
@@ -278,7 +279,7 @@ def truncate_seq_pair(tokens_a, m_info_a, tokens_b, m_info_b, max_num_tokens, rn
 
 
 def main():
-
+    print(torch.cuda.is_available())
     parser = argparse.ArgumentParser()
     ## Required parameters
     parser.add_argument("--input_dir",
@@ -364,6 +365,9 @@ def main():
     parser.add_argument('--part',
                         type=int,
                         default=0)
+    parser.add_argument('--max_proc',
+                        type=int, 
+                        default=1)
 
     args = parser.parse_args()
     print(args)
@@ -378,23 +382,28 @@ def main():
 
     print("creating instance from {}".format(args.input_dir))
     processor = processors[args.task_name]()
-    eval_examples = processor.get_pretrain_examples(args.input_dir, args.part)
-    print(len(eval_examples))
+    eval_examples = processor.get_pretrain_examples(args.input_dir, args.part, args.max_proc)
+    # print(len(eval_examples))
     data = [example.text_a for example in eval_examples]
+    # print(data)
     all_labels = [example.label for example in eval_examples]
     label_list = processor.get_labels()
     logger.info("Bert Model: " + args.bert_model)
+    print(torch.cuda.is_available())
     if args.rand_gen:
         generator = RandMask(args.masked_lm_prob, args.bert_model, args.do_lower_case, args.max_seq_length)
     else:    
         generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
     # input_files = []
+    # print(args.part)
     instances = create_training_instances(
         data, all_labels, args.task_name, generator, args.max_seq_length, args.dupe_factor,
         args.short_seq_prob, args.masked_lm_prob, args.max_predictions_per_seq,
         rng)
-        
-    output_file = os.path.join(args.output_dir, "{}.hdf5".format(args.part))        
+    if args.part >= 0:
+        output_file = os.path.join(args.output_dir, "{}.hdf5".format(args.part))        
+    else:
+        output_file = os.path.join(args.output_dir, "0.hdf5") 
     write_instance_to_example_file(instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, output_file)
     
 

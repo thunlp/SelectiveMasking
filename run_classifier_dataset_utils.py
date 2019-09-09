@@ -229,19 +229,22 @@ class YelpProcessor(DataProcessor):
         return self._create_examples(
             self._read_tsv(os.path.join(data_dir, "train.csv"), quotechar='"', delimiter=','), "train")
 
-    def get_pretrain_examples(self, data_dir, part):
+    def get_pretrain_examples(self, data_dir, part, max_proc):
         """See base class"""
         lines = self._read_tsv(os.path.join(data_dir, "train.csv"), quotechar='"', delimiter=',')
         data_size = len(lines)
-        part_size = data_size // 8
-        begin = part*part_size
-        end = (part+1)*part_size
-        print(begin, end)
-        if end - begin < 1000:
-            begin = 0
-            end = data_size
-        if part == 7:
-            end = data_size
+        part_size = data_size // max_proc
+        begin = 0
+        end = data_size
+        if part >= 0:
+            begin = part*part_size
+            end = (part+1)*part_size
+            # print(begin, end)
+            # if end - begin < 1000:
+                # begin = 0
+                # end = data_size
+            if part == max_proc - 1:
+                end = data_size
         examples = []
         for i, line in enumerate(lines[begin:end]):
             label = line[0]

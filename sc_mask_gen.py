@@ -122,7 +122,23 @@ class SC(nn.Module):
             masked_info[pos]["mask"] = mask_token
             masked_info[pos]["label"] = sen[pos]
         return masked_info
-        
+
+    def create_reverse_mask(self, mask_poses, sen, rng):
+        reverse_mask_poses = [i for i in range(len(sen)) if i not in mask_poses]
+        rng.shuffle(reverse_mask_poses)
+        cand_indexes = reverse_mask_poses[0:max(1, int(self.mask_rate * len(sen)))]
+        masked_info = [{} for token in sen]
+        for cand_index in cand_indexes:
+            if rng.random() < 0.8:
+                mask_token = "[MASK]"
+            else:
+                if rng.random() < 0.5:
+                    mask_token = sen[cand_index]
+                else:
+                    mask_token = self.vocab[rng.randint(0, len(self.vocab) - 1)]
+            masked_info[cand_index]["mask"] = mask_token
+            masked_info[cand_index]["label"] = sen[cand_index]
+        return masked_info
 
     def forward(self, data, all_labels, rng):
         # 输入没有tokenized 的段，和每段对应的分类结果
@@ -257,9 +273,9 @@ class SC(nn.Module):
         #     st = st[0:max(int(self.top_token_rate * len(st)), 1)]
         #     mask_pos_d[sen_doc_pos], _ = zip(*st)
         
-        print(mask_poses_d)
-        for key, value in mask_poses_d.items():
-            print([sentences[key][pos] for pos in mask_poses_d[key]])
+        # print(mask_poses_d)
+        # for key, value in mask_poses_d.items():
+            # print([sentences[key][pos] for pos in mask_poses_d[key]])
         all_documents = []
 
         # 生成带有mask信息的document
@@ -271,7 +287,7 @@ class SC(nn.Module):
                 mask_poses = []
                 if i in mask_poses_d:
                     mask_poses = mask_poses_d[i]
-                m_info = self.create_mask(mask_poses, sentences[i], rng)
+                m_info = self.create_reverse_mask(mask_poses, sentences[i], rng)
                 all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
                 i += 1
             # print(all_documents[-1])

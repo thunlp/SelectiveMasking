@@ -730,7 +730,7 @@ class BertModel(BertPreTrainedModel):
         super(BertModel, self).__init__(config)
         self.embeddings = BertEmbeddings(config)
         self.encoder = BertEncoder(config)
-        self.pooler = BertPooler(config)
+        self.pooler = BertPooler(config) # NOTE not need in pretrain bert
         self.apply(self.init_bert_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None, output_all_encoded_layers=True, checkpoint_activations=False):
@@ -759,10 +759,10 @@ class BertModel(BertPreTrainedModel):
                                       extended_attention_mask,
                                       output_all_encoded_layers=output_all_encoded_layers, checkpoint_activations=checkpoint_activations)
         sequence_output = encoded_layers[-1]
-        pooled_output = self.pooler(sequence_output)
+        pooled_output = self.pooler(sequence_output) # NOTE not need in pretrain bert
         if not output_all_encoded_layers:
             encoded_layers = encoded_layers[-1]
-        return encoded_layers , pooled_output
+        return encoded_layers , pooled_output # NOTE pooled_output not need in pretrain bert
 
 
 class BertForPreTraining(BertPreTrainedModel):
