@@ -231,6 +231,8 @@ class YelpProcessor(DataProcessor):
 
     def get_pretrain_examples(self, data_dir, part, max_proc):
         """See base class"""
+        print(part)
+        print(max_proc)
         lines = self._read_tsv(os.path.join(data_dir, "train.csv"), quotechar='"', delimiter=',')
         data_size = len(lines)
         part_size = data_size // max_proc
@@ -275,6 +277,7 @@ class YelpProcessor(DataProcessor):
             examples[label].append(InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
         # 500 for each
         if set_type != "dev":
+            print("OK")
             examples_ = []
             for k, v in examples.items():
                 examples_.extend(v[:500])

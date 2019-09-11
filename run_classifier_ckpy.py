@@ -35,7 +35,7 @@ from torch.nn import CrossEntropyLoss, MSELoss
 # from tensorboardX import SummaryWriter
 
 # from file_utils import WEIGHTS_NAME, CONFIG_NAME
-from modeling import BertForSequenceClassification, WEIGHTS_NAME, CONFIG_NAME
+from modeling_classification import BertForSequenceClassification, WEIGHTS_NAME, CONFIG_NAME
 from tokenization import BertTokenizer
 from optimization import BertAdam, warmup_linear
 
@@ -247,6 +247,7 @@ def main():
 
         # Prepare data loader
         train_examples = processor.get_train_examples(args.data_dir)
+        print(len(train_examples))
         cached_train_features_file = os.path.join(args.data_dir, 'train_{0}_{1}_{2}'.format(
             list(filter(None, args.bert_model.split('/'))).pop(),
                         str(args.max_seq_length),
@@ -270,7 +271,7 @@ def main():
             all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.long)
         elif output_mode == "regression":
             all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.float)
-
+        print(len(all_input_ids))
         train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
         if args.local_rank == -1:
             train_sampler = RandomSampler(train_data)

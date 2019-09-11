@@ -35,7 +35,7 @@ from torch.nn import CrossEntropyLoss, MSELoss
 # from tensorboardX import SummaryWriter
 
 # from file_utils import WEIGHTS_NAME, CONFIG_NAME
-from modeling import BertForSequenceClassification, WEIGHTS_NAME, CONFIG_NAME
+from modeling_classification import BertForSequenceClassification, WEIGHTS_NAME, CONFIG_NAME
 from tokenization import BertTokenizer
 from optimization import BertAdam, warmup_linear
 

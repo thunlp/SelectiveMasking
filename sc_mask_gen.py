@@ -273,9 +273,9 @@ class SC(nn.Module):
         #     st = st[0:max(int(self.top_token_rate * len(st)), 1)]
         #     mask_pos_d[sen_doc_pos], _ = zip(*st)
         
-        # print(mask_poses_d)
-        # for key, value in mask_poses_d.items():
-            # print([sentences[key][pos] for pos in mask_poses_d[key]])
+        print(mask_poses_d)
+        for key, value in mask_poses_d.items():
+            print([sentences[key][pos] for pos in mask_poses_d[key]])
         all_documents = []
 
         # 生成带有mask信息的document
