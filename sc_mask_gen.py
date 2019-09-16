@@ -10,7 +10,7 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, Tens
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.functional import softmax
 
-from modeling import BertForSequenceClassification
+from modeling_classification import BertForSequenceClassification
 from tokenization import BertTokenizer
 
 logger = logging.getLogger(__name__)
@@ -140,7 +140,7 @@ class SC(nn.Module):
             masked_info[cand_index]["label"] = sen[cand_index]
         return masked_info
 
-    def forward(self, data, all_labels, rng):
+    def forward(self, data, all_labels, dupe_factor, rng):
         # 输入没有tokenized 的段，和每段对应的分类结果
         # data: not tokenized
         # convert label to ids
@@ -273,23 +273,23 @@ class SC(nn.Module):
         #     st = st[0:max(int(self.top_token_rate * len(st)), 1)]
         #     mask_pos_d[sen_doc_pos], _ = zip(*st)
         
-        print(mask_poses_d)
-        for key, value in mask_poses_d.items():
-            print([sentences[key][pos] for pos in mask_poses_d[key]])
+        # print(mask_poses_d)
+        # for key, value in mask_poses_d.items():
+            # print([sentences[key][pos] for pos in mask_poses_d[key]])
         all_documents = []
 
         # 生成带有mask信息的document
         # all_document = [[m_info0（每个句子的mask信息）, m_info1,... ]（第一段）, [...]（第二段）, ...]
-        i = 0
-        for doc_id in tqdm(range(doc_num), desc="Generating All Documents"):
-            all_documents.append([])
-            while i < len(sen_doc_ids) and doc_id == sen_doc_ids[i]:
-                mask_poses = []
-                if i in mask_poses_d:
-                    mask_poses = mask_poses_d[i]
-                m_info = self.create_reverse_mask(mask_poses, sentences[i], rng)
-                all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
-                i += 1
-            # print(all_documents[-1])
-
+        for _ in range(dupe_factor):
+            i = 0
+            for doc_id in tqdm(range(doc_num), desc="Generating All Documents"):
+                all_documents.append([])
+                while i < len(sen_doc_ids) and doc_id == sen_doc_ids[i]:
+                    mask_poses = []
+                    if i in mask_poses_d:
+                        mask_poses = mask_poses_d[i]
+                    m_info = self.create_reverse_mask(mask_poses, sentences[i], rng)
+                    all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
+                    i += 1
+                # print(all_documents[-1])
         return all_documents

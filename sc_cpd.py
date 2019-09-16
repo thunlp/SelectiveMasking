@@ -148,14 +148,13 @@ def create_training_instances(data, all_labels, task_name, generator, max_seq_le
 
     instances = []
     # Remove empty documents
-    for _ in range(dupe_factor):
-        all_documents = generator(data, all_labels, rng)
-        all_documents = [x for x in all_documents if x]
-        print(len(all_documents))
-        rng.shuffle(all_documents)
-        for document_index in range(len(all_documents)):
-            instances.extend(create_instances_from_document(all_documents, document_index, max_seq_length, short_seq_prob,
-                masked_lm_prob, max_predictions_per_seq, rng))
+    all_documents = generator(data, all_labels, dupe_factor, rng)
+    all_documents = [x for x in all_documents if x]
+    print(len(all_documents))
+    rng.shuffle(all_documents)
+    for document_index in range(len(all_documents)):
+        instances.extend(create_instances_from_document(all_documents, document_index, max_seq_length, short_seq_prob,
+            masked_lm_prob, max_predictions_per_seq, rng))
 
     rng.shuffle(instances)
     return instances

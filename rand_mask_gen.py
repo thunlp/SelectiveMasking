@@ -33,32 +33,33 @@ class RandMask(nn.Module):
             bert_model, do_lower_case=do_lower_case)
         self.vocab = list(self.tokenizer.vocab.keys())
 
-    def forward(self, data, all_labels, rng):
+    def forward(self, data, all_labels, dupe_factor, rng):
         # 输入没有tokenized 的段，和每段对应的分类结果
         # data: not tokenized
         all_documents = []
-        for line in tqdm(data):
-            all_documents.append([])
-            tokens = self.tokenizer.tokenize(line)
-            cand_indexes = [i for i in range(len(tokens))]
-            rng.shuffle(cand_indexes)
-            masked_info = [{} for token in tokens]
-            masked_token = None
-            masked_lms_len = 0
-            num_to_predict = max(1, int(round(len(tokens) * self.mask_rate)))
-            for index in cand_indexes:
-                if masked_lms_len >= num_to_predict:
-                    break
-                if rng.random() < 0.8:
-                    masked_token = "[MASK]"
-                else:
-                    if rng.random() < 0.5:
-                        masked_token = tokens[index]
+        for _ in range(dupe_factor):
+            for line in tqdm(data):
+                all_documents.append([])
+                tokens = self.tokenizer.tokenize(line)
+                cand_indexes = [i for i in range(len(tokens))]
+                rng.shuffle(cand_indexes)
+                masked_info = [{} for token in tokens]
+                masked_token = None
+                masked_lms_len = 0
+                num_to_predict = max(1, int(round(len(tokens) * self.mask_rate)))
+                for index in cand_indexes:
+                    if masked_lms_len >= num_to_predict:
+                        break
+                    if rng.random() < 0.8:
+                        masked_token = "[MASK]"
                     else:
-                        masked_token = self.vocab[rng.randint(0, len(self.vocab) - 1)]
-                
-                masked_info[index]["mask"] = masked_token
-                masked_info[index]["label"] = tokens[index]
-                masked_lms_len += 1
-            all_documents[-1].append(MaskedTokenInstance(tokens=tokens, info=masked_info))
+                        if rng.random() < 0.5:
+                            masked_token = tokens[index]
+                        else:
+                            masked_token = self.vocab[rng.randint(0, len(self.vocab) - 1)]
+                    
+                    masked_info[index]["mask"] = masked_token
+                    masked_info[index]["label"] = tokens[index]
+                    masked_lms_len += 1
+                all_documents[-1].append(MaskedTokenInstance(tokens=tokens, info=masked_info))
         return all_documents
