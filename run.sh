@@ -9,12 +9,12 @@ python3 run_classifier_ckpy.py \
     --do_eval \
     --task_name=yelp     \
     --data_dir=${YELP_DIR}/  \
-    --output_dir=results/yelp_reverse_10dup/finetune/ckpt_${ITER}  \
+    --output_dir=results/yelp_mask_1dup/finetune/ckpt_${ITER}  \
     --max_seq_length=256   \
     --train_batch_size=32 \
     --num_train_epochs=3 \
     --learning_rate=2e-5 \
     --do_lower_case \
-    --ckpt=results/yelp_reverse_10dup/checkpoints/ckpt_${ITER}.pt \
+    --ckpt=results/yelp_mask_1dup/checkpoints/ckpt_${ITER}.pt \
     --fp16 \
     --gradient_accumulation_steps 2

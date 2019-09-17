@@ -288,7 +288,7 @@ class SC(nn.Module):
                     mask_poses = []
                     if i in mask_poses_d:
                         mask_poses = mask_poses_d[i]
-                    m_info = self.create_reverse_mask(mask_poses, sentences[i], rng)
+                    m_info = self.create_mask(mask_poses, sentences[i], rng)
                     all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
                     i += 1
                 # print(all_documents[-1])
