@@ -7,13 +7,14 @@ import logging
 import os
 import random
 import sys
+import pickle
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
 from modeling_classification import (CONFIG_NAME, WEIGHTS_NAME, BertConfig, BertForTokenClassification)
-from optimization import BertAdam, WarmupLinearSchedule
+from optimization import BertAdam, warmup_linear
 from tokenization import BertTokenizer
 from seqeval.metrics import classification_report, f1_score
 from torch import nn
@@ -52,41 +53,20 @@ class InputExample(object):
 class InputFeatures(object):
     """A single set of features of data."""
 
-    def __init__(self, input_ids, input_mask, segment_ids, label_id, valid_ids=None, label_mask=None):
+    def __init__(self, input_ids, input_mask, segment_ids, label_id):
         self.input_ids = input_ids
         self.input_mask = input_mask
         self.segment_ids = segment_ids
         self.label_id = label_id
-        self.valid_ids = valid_ids
-        self.label_mask = label_mask
 
 
 def readfile(filename):
     '''
     read file
-    return format :
-    [ ['EU', 'B-ORG'], ['rejects', 'O'], ['German', 'B-MISC'], ['call', 'O'], ['to', 'O'], ['boycott', 'O'], ['British', 'B-MISC'], ['lamb', 'O'], ['.', 'O'] ]
+    return format [(['I', 'like', 'Marvel'], [0, 1, 0]), (), ...]
     '''
-    f = open(filename)
-    data = []
-    sentence = []
-    label = []
-    for line in f:
-        if len(line) == 0 or line.startswith('-DOCSTART') or line[0] == "\n":
-            if len(sentence) > 0:
-                data.append((sentence, label))
-                sentence = []
-                label = []
-            continue
-        splits = line.split(' ')
-        sentence.append(splits[0])
-        label.append(splits[-1][:-1])
-
-    if len(sentence) > 0:
-        data.append((sentence, label))
-        sentence = []
-        label = []
-    return data
+    f = open(filename, "rb")
+    return pickle.load(f)
 
 
 class DataProcessor(object):
@@ -110,32 +90,32 @@ class DataProcessor(object):
         return readfile(input_file)
 
 
-class NerProcessor(DataProcessor):
+class MaskGenProcessor(DataProcessor):
     """Processor for the CoNLL-2003 data set."""
 
     def get_train_examples(self, data_dir):
         """See base class."""
         return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "train.txt")), "train")
+            self._read_tsv(os.path.join(data_dir, "train.pkl")), "train")
 
     def get_dev_examples(self, data_dir):
         """See base class."""
         return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "valid.txt")), "dev")
+            self._read_tsv(os.path.join(data_dir, "valid.pkl")), "dev")
 
     def get_test_examples(self, data_dir):
         """See base class."""
         return self._create_examples(
-            self._read_tsv(os.path.join(data_dir, "test.txt")), "test")
+            self._read_tsv(os.path.join(data_dir, "test.pkl")), "test")
 
     def get_labels(self):
-        return ["O", "B-MISC", "I-MISC", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "[CLS]", "[SEP]"]
+        return [0, 1]
 
     def _create_examples(self, lines, set_type):
         examples = []
         for i, (sentence, label) in enumerate(lines):
             guid = "%s-%s" % (set_type, i)
-            text_a = ' '.join(sentence)
+            text_a = sentence
             text_b = None
             label = label
             examples.append(InputExample(
@@ -146,69 +126,41 @@ class NerProcessor(DataProcessor):
 def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer):
     """Loads a data file into a list of `InputBatch`s."""
 
-    label_map = {label: i for i, label in enumerate(label_list, 1)}
+    # label_map = {label: i for i, label in enumerate(label_list, 1)}
 
     features = []
     for (ex_index, example) in enumerate(examples):
-        textlist = example.text_a.split(' ')
-        labellist = example.label
-        tokens = []
-        labels = []
-        valid = []
-        label_mask = []
-        for i, word in enumerate(textlist):
-            token = tokenizer.tokenize(word)
-            tokens.extend(token)
-            label_1 = labellist[i]
-            for m in range(len(token)):
-                if m == 0:
-                    labels.append(label_1)
-                    valid.append(1)
-                    label_mask.append(1)
-                else:
-                    valid.append(0)
+        tokens = example.text_a
+        labels = example.label
         if len(tokens) >= max_seq_length - 1:
             tokens = tokens[0:(max_seq_length - 2)]
             labels = labels[0:(max_seq_length - 2)]
-            valid = valid[0:(max_seq_length - 2)]
-            label_mask = label_mask[0:(max_seq_length - 2)]
         ntokens = []
         segment_ids = []
         label_ids = []
         ntokens.append("[CLS]")
         segment_ids.append(0)
-        valid.insert(0, 1)
-        label_mask.insert(0, 1)
-        label_ids.append(label_map["[CLS]"])
+        label_ids.append(0) # label 0 for CLS
         for i, token in enumerate(tokens):
             ntokens.append(token)
             segment_ids.append(0)
-            if len(labels) > i:
-                label_ids.append(label_map[labels[i]])
+            label_ids.append(labels[i])
         ntokens.append("[SEP]")
         segment_ids.append(0)
-        valid.append(1)
-        label_mask.append(1)
-        label_ids.append(label_map["[SEP]"])
+        label_ids.append(0) # label 0 for SEP
         input_ids = tokenizer.convert_tokens_to_ids(ntokens)
         input_mask = [1] * len(input_ids)
-        label_mask = [1] * len(label_ids)
         while len(input_ids) < max_seq_length:
             input_ids.append(0)
             input_mask.append(0)
             segment_ids.append(0)
             label_ids.append(0)
-            valid.append(1)
-            label_mask.append(0)
         while len(label_ids) < max_seq_length:
             label_ids.append(0)
-            label_mask.append(0)
         assert len(input_ids) == max_seq_length
         assert len(input_mask) == max_seq_length
         assert len(segment_ids) == max_seq_length
         assert len(label_ids) == max_seq_length
-        assert len(valid) == max_seq_length
-        assert len(label_mask) == max_seq_length
 
         # if ex_index < 5:
         # logger.info("*** Example ***")
@@ -222,9 +174,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         features.append(InputFeatures(input_ids=input_ids,
                                       input_mask=input_mask,
                                       segment_ids=segment_ids,
-                                      label_id=label_ids,
-                                      valid_ids=valid,
-                                      label_mask=label_mask))
+                                      label_id=label_ids))
     return features
 
 
@@ -247,12 +197,8 @@ def evaluate(model, data_dir, eval_type, processor, tokenizer, max_seq_length, l
         [f.segment_ids for f in eval_features], dtype=torch.long)
     all_label_ids = torch.tensor(
         [f.label_id for f in eval_features], dtype=torch.long)
-    all_valid_ids = torch.tensor(
-        [f.valid_ids for f in eval_features], dtype=torch.long)
-    all_lmask_ids = torch.tensor(
-        [f.label_mask for f in eval_features], dtype=torch.long)
     eval_data = TensorDataset(all_input_ids, all_input_mask,
-                              all_segment_ids, all_label_ids, all_valid_ids, all_lmask_ids)
+                              all_segment_ids, all_label_ids)
     # Run prediction for full data
     eval_sampler = SequentialSampler(eval_data)
     eval_dataloader = DataLoader(
@@ -263,37 +209,36 @@ def evaluate(model, data_dir, eval_type, processor, tokenizer, max_seq_length, l
     y_true = []
     y_pred = []
     label_map = {i: label for i, label in enumerate(label_list, 1)}
-    for input_ids, input_mask, segment_ids, label_ids, valid_ids, l_mask in tqdm(eval_dataloader, desc="Evaluating"):
+    for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
         input_ids = input_ids.to(device)
         input_mask = input_mask.to(device)
         segment_ids = segment_ids.to(device)
-        valid_ids = valid_ids.to(device)
         label_ids = label_ids.to(device)
-        l_mask = l_mask.to(device)
 
         with torch.no_grad():
-            logits = model(input_ids, segment_ids, input_mask,
-                           valid_ids=valid_ids, attention_mask_label=l_mask)
+            logits = model(input_ids, segment_ids, input_mask)
 
         logits = torch.argmax(F.log_softmax(logits, dim=2), dim=2)
         logits = logits.detach().cpu().numpy()
         label_ids = label_ids.to('cpu').numpy()
         input_mask = input_mask.to('cpu').numpy()
 
-        for i, label in enumerate(label_ids):
-            temp_1 = []
-            temp_2 = []
-            for j, m in enumerate(label):
-                if j == 0:
-                    continue
-                elif label_ids[i][j] == 11:
-                    y_true.append(temp_1)
-                    y_pred.append(temp_2)
-                    break
-                else:
-                    temp_1.append(label_map[label_ids[i][j]])
-                    temp_2.append(label_map[logits[i][j]])
+        # for i, label in enumerate(label_ids):
+        #     temp_1 = []
+        #     temp_2 = []
+        #     for j, m in enumerate(label):
+        #         if j == 0:
+        #             continue
+        #         elif label_ids[i][j] == 11:
+        #             y_true.append(temp_1)
+        #             y_pred.append(temp_2)
+        #             break
+        #         else:
+        #             temp_1.append(label_ids[i][j])
+        #             temp_2.append(logits[i][j])
 
+    y_true = [[str(x) for x in L] for L in label_ids]
+    y_pred = [[str(x) for x in L] for L in logits]
     report = classification_report(y_true, y_pred, digits=4)
     f_score = f1_score(y_true, y_pred)
     return report, f_score
@@ -394,7 +339,7 @@ def main():
 
     max_f1_score = 0
 
-    processors = {"ner": NerProcessor}
+    processors = {"maskgen": MaskGenProcessor}
 
     if args.local_rank == -1 or args.no_cuda:
         device = torch.device(
@@ -436,7 +381,7 @@ def main():
 
     processor = processors[task_name]()
     label_list = processor.get_labels()
-    num_labels = len(label_list) + 1
+    num_labels = len(label_list)
 
     if args.vocab_file:
         tokenizer = BertTokenizer(args.vocab_file, args.do_lower_case)
@@ -525,12 +470,8 @@ def main():
             [f.segment_ids for f in train_features], dtype=torch.long)
         all_label_ids = torch.tensor(
             [f.label_id for f in train_features], dtype=torch.long)
-        all_valid_ids = torch.tensor(
-            [f.valid_ids for f in train_features], dtype=torch.long)
-        all_lmask_ids = torch.tensor(
-            [f.label_mask for f in train_features], dtype=torch.long)
         train_data = TensorDataset(all_input_ids, all_input_mask,
-                                   all_segment_ids, all_label_ids, all_valid_ids, all_lmask_ids)
+                                   all_segment_ids, all_label_ids)
         if args.local_rank == -1:
             train_sampler = RandomSampler(train_data)
         else:
@@ -538,17 +479,15 @@ def main():
         train_dataloader = DataLoader(
             train_data, sampler=train_sampler, batch_size=args.train_batch_size)
 
-        warmup_linear = WarmupLinearSchedule(
-            warmup=args.warmup_proportion, t_total=num_train_optimization_steps)
+        # warmup_linear = WarmupLinearSchedule(warmup=args.warmup_proportion, t_total=num_train_optimization_steps)
         for _ in trange(int(args.num_train_epochs), desc="Epoch"):
             model.train()
             tr_loss = 0
             nb_tr_examples, nb_tr_steps = 0, 0
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 batch = tuple(t.to(device) for t in batch)
-                input_ids, input_mask, segment_ids, label_ids, valid_ids, l_mask = batch
-                loss = model(input_ids, segment_ids, input_mask,
-                             label_ids, valid_ids, l_mask)
+                input_ids, input_mask, segment_ids, label_ids = batch
+                loss = model(input_ids, segment_ids, input_mask, label_ids)
                 if n_gpu > 1:
                     loss = loss.mean()  # mean() to average on multi-gpu.
                 if args.gradient_accumulation_steps > 1:

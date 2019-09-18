@@ -215,13 +215,14 @@ def main():
     
     model = BertForSequenceClassification.from_pretrained(args.bert_model, num_labels=num_labels)
 
-    model_dict = model.state_dict()
-    ckpt = torch.load(args.ckpt)
-    pretrained_dict = ckpt['model']
-    new_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict.keys()}
-    model_dict.update(new_dict)
-    print('Total : {}, update: {}'.format(len(pretrained_dict), len(new_dict)))
-    model.load_state_dict(model_dict)
+    if args.ckpt:
+        model_dict = model.state_dict()
+        ckpt = torch.load(args.ckpt)
+        pretrained_dict = ckpt['model']
+        new_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict.keys()}
+        model_dict.update(new_dict)
+        print('Total : {}, update: {}'.format(len(pretrained_dict), len(new_dict)))
+        model.load_state_dict(model_dict)
     
     if args.local_rank == 0:
         torch.distributed.barrier()
@@ -262,7 +263,7 @@ def main():
                 logger.info("  Saving train features into cached file %s", cached_train_features_file)
                 with open(cached_train_features_file, "wb") as writer:
                     pickle.dump(train_features, writer)
-
+        print(len(train_features))
         all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)

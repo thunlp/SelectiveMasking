@@ -226,6 +226,7 @@ class YelpProcessor(DataProcessor):
     """Processor for the Yelp data set"""
     def get_train_examples(self, data_dir):
         """See base class"""
+        print("get train examples")
         return self._create_examples(
             self._read_tsv(os.path.join(data_dir, "train.csv"), quotechar='"', delimiter=','), "train")
 
@@ -265,32 +266,13 @@ class YelpProcessor(DataProcessor):
 
     def _create_examples(self, lines, set_type):
         """Creates examples for the training and dev sets."""
-        from collections import defaultdict
-        import random
-        examples = defaultdict(list)
-        random.seed(888)
-        random.shuffle(lines)
+        examples = []
         for (i, line) in enumerate(lines):
             guid = "%s-%s" % (set_type, i)
             text_a = line[1]
             label = line[0]
-            examples[label].append(InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
-        # 500 for each
-        if set_type != "dev":
-            print("OK")
-            examples_ = []
-            for k, v in examples.items():
-                examples_.extend(v[:500])
-            random.seed(888)
-            random.shuffle(examples_)
-            return examples_
-        else:
-            examples_ = []
-            for k, v in examples.items():
-                examples_.extend(v)
-            return examples_
-
-        
+            examples.append(InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+        return examples
 
 class StsbProcessor(DataProcessor):
     """Processor for the STS-B data set (GLUE version)."""

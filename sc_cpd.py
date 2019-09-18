@@ -165,9 +165,9 @@ def create_training_instances(data, all_labels, task_name, generator, max_seq_le
 
     labeled_data = []
     for document in all_documents:
-        labeled_data.append([])
+        # labeled_data.append([])
         for sentence in document:
-            labeled_data[-1].append({"tokens": sentence.tokens, "label": [1 if x else 0 for x in sentence.info]})
+            labeled_data.append((sentence.tokens, [1 if x else 0 for x in sentence.info]))
     # print(labeled_data)
     return instances, labeled_data
 
@@ -408,7 +408,7 @@ def main():
     # input_files = []
     # print(args.part)
     instances, labeled_data = create_training_instances(
-        data[1:2], all_labels[1:2], args.task_name, generator, args.max_seq_length, args.dupe_factor,
+        data, all_labels, args.task_name, generator, args.max_seq_length, args.dupe_factor,
         args.short_seq_prob, args.masked_lm_prob, args.max_predictions_per_seq,
         rng)
     if args.part >= 0:

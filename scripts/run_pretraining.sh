@@ -16,13 +16,13 @@ seed=${12:-42}
 job_name=${13:-"job"}
 
 
-DATASET=yelp_mask_1dup # change this for other datasets
+DATASET=rand_mask_yelp # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
 BERT_CONFIG=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
 LOAD_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
-RESULTS_DIR=/home/gyx/nvidia-bert/results/yelp_mask_1dup
-CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/yelp_mask_1dup/checkpoints
+RESULTS_DIR=/home/gyx/nvidia-bert/results/rand_mask_yelp
+CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/rand_mask_yelp/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 

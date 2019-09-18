@@ -2,22 +2,10 @@
 
 source utils/config.sh
 
-INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/
-INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_yelp/
-OUTPUT_DIR=/home/gyx/nvidia-bert/data/yelp_mask_test/hdf5_shards
-#BERT_MODEL=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/uncase
-BERT_MODEL=/home/gyx/nvidia-bert/outputs/yelp_first/uncase_8000
-# BERT_MODEL=../outputs/yelp_second/uncase_25000/
-# BERT_MODEL=../outputs/yelp_full
-TOP_SEN_RATE=1
-THRESHOLD=0.02
-mkdir -p ${OUTPUT_DIR}
-LOWER_CASE_SWITCH=""
-if [ "$DO_LOWER_CASE" = true ] ; then
-  LOWER_CASE_SWITCH="--do_lower_case" 
-fi
 # OUTPUT_FILE="${OUTPUT_DIR}/${SHARD_INDEX}.hdf5"
 echo "Bert model: ${BERT_MODEL}"
+echo "Input dir: ${INPUT_DIR}"
+echo "Output dir: ${OUTPUT_DIR}"
 
 PART=$1
 # echo $INPUT_DIR

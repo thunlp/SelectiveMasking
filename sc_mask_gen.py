@@ -162,14 +162,14 @@ class SC(nn.Module):
             sentences.extend(tL)
             sen_doc_ids.extend([doc_id] * len(tL))
 
-        # print(data)
+        print(data)
         # print(all_label_ids)
         # print(sentences)
         # print(sen_doc_ids)
         logger.info("Begin eval for all sentence")
         sens_preds, sens_pred_scores = self.evaluate(sentences, self.sen_batch_size)
         print(sens_preds)
-        # print(sens_pred_scores)
+        print(sens_pred_scores)
 
         # 所有分类正确的句子的信息
         right_sens = [] # 分类正确的句子
@@ -200,7 +200,7 @@ class SC(nn.Module):
         
         print(right_sens)
         print(right_preds)
-        # print(right_scores)
+        print(right_scores)
         # print(right_sen_doc_ids)
         # print(right_sen_doc_poses)
 
@@ -221,13 +221,13 @@ class SC(nn.Module):
         # 每一轮循环过后，masked_sens里面的句子长度会加一（上一个词没有被选中，并加入了下一个词），或者不变（上一个词被选中了，并加入了下一个词），句子个数逐渐变少
         while len(masked_sens) != 0:
             # print(mask_pos)
-            # print(masked_sens)
+            print(masked_sens)
             _, mask_sens_scores = self.evaluate(masked_sens, self.sen_batch_size)
             masked_sens_num = len(masked_sens)
             temp_masked_sens = []
             temp_masked_item_infos = []
             for masked_sen, masked_item_info, mask_sens_score in zip(masked_sens, masked_item_infos, mask_sens_scores):
-                # print(mask_sens_score)
+                print(mask_sens_score)
                 sen_doc_pos = masked_item_info["sen_doc_pos"]
                 doc_ground_truth = masked_item_info["doc_ground_truth"]
                 sen_right_id = masked_item_info["sen_right_id"]
