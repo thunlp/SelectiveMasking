@@ -25,6 +25,7 @@ import h5py
 import numpy as np
 from tqdm import tqdm, trange
 import json
+import pickle
 
 from tokenization import BertTokenizer
 import tokenization as tokenization
@@ -143,6 +144,10 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
     f.flush()
     f.close()
 
+def write_labeled_data(labeled_data, output_file):
+    with open(output_file, "wb") as f:
+        pickle.dump(labeled_data, f)
+
 def create_training_instances(data, all_labels, task_name, generator, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng):
     """Create `TrainingInstance`s from raw text."""
 
@@ -150,14 +155,21 @@ def create_training_instances(data, all_labels, task_name, generator, max_seq_le
     # Remove empty documents
     all_documents = generator(data, all_labels, dupe_factor, rng)
     all_documents = [x for x in all_documents if x]
-    print(len(all_documents))
+    # print(all_documents)
     rng.shuffle(all_documents)
     for document_index in range(len(all_documents)):
         instances.extend(create_instances_from_document(all_documents, document_index, max_seq_length, short_seq_prob,
             masked_lm_prob, max_predictions_per_seq, rng))
 
     rng.shuffle(instances)
-    return instances
+
+    labeled_data = []
+    for document in all_documents:
+        labeled_data.append([])
+        for sentence in document:
+            labeled_data[-1].append({"tokens": sentence.tokens, "label": [1 if x else 0 for x in sentence.info]})
+    # print(labeled_data)
+    return instances, labeled_data
 
 
 def create_instances_from_document(
@@ -395,16 +407,18 @@ def main():
         generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
     # input_files = []
     # print(args.part)
-    instances = create_training_instances(
-        data, all_labels, args.task_name, generator, args.max_seq_length, args.dupe_factor,
+    instances, labeled_data = create_training_instances(
+        data[1:2], all_labels[1:2], args.task_name, generator, args.max_seq_length, args.dupe_factor,
         args.short_seq_prob, args.masked_lm_prob, args.max_predictions_per_seq,
         rng)
     if args.part >= 0:
         output_file = os.path.join(args.output_dir, "{}.hdf5".format(args.part))        
+        labeled_output_file = os.path.join(args.output_dir, "{}.pkl".format(args.part))     
     else:
         output_file = os.path.join(args.output_dir, "0.hdf5") 
+        labeled_output_file = os.path.join(args.output_dir, "0.pkl")
     write_instance_to_example_file(instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, output_file)
-    
+    write_labeled_data(labeled_data, labeled_output_file)
 
 if __name__ == "__main__":
     main()

@@ -168,7 +168,7 @@ class SC(nn.Module):
         # print(sen_doc_ids)
         logger.info("Begin eval for all sentence")
         sens_preds, sens_pred_scores = self.evaluate(sentences, self.sen_batch_size)
-        # print(sens_preds)
+        print(sens_preds)
         # print(sens_pred_scores)
 
         # 所有分类正确的句子的信息
@@ -198,8 +198,8 @@ class SC(nn.Module):
             right_sen_doc_ids.extend(t_sen_doc_id)
             right_sen_doc_poses.extend(t_sen_doc_pos)
         
-        # print(right_sens)
-        # print(right_preds)
+        print(right_sens)
+        print(right_preds)
         # print(right_scores)
         # print(right_sen_doc_ids)
         # print(right_sen_doc_poses)
@@ -273,9 +273,9 @@ class SC(nn.Module):
         #     st = st[0:max(int(self.top_token_rate * len(st)), 1)]
         #     mask_pos_d[sen_doc_pos], _ = zip(*st)
         
-        # print(mask_poses_d)
-        # for key, value in mask_poses_d.items():
-            # print([sentences[key][pos] for pos in mask_poses_d[key]])
+        print(mask_poses_d)
+        for key, value in mask_poses_d.items():
+            print([sentences[key][pos] for pos in mask_poses_d[key]])
         all_documents = []
 
         # 生成带有mask信息的document
