@@ -270,7 +270,6 @@ def main():
                              "Positive power of 2: static loss scaling value.\n")
     args = parser.parse_args()
 
-    sample_weight = torch.HalfTensor([100.0, 1.0]).cuda()
     processors = {"maskgen": MaskGenProcessor}
 
     if args.local_rank == -1 or args.no_cuda:
@@ -351,7 +350,35 @@ def main():
     num_train_optimization_steps = None
     if args.do_train:
         train_examples = processor.get_train_examples(args.data_dir)
-        train_features = convert_examples_to_features(train_examples, label_list, args.max_seq_length, tokenizer)
+        
+        ones_num = 0
+        zeros_num = 0
+        for example in train_examples:
+            for l in example.label:
+                if l == 0:
+                    zeros_num += 1
+                else:
+                    ones_num += 1
+
+        rate = zeros_num / ones_num
+        print("statistic: ", zeros_num, ones_num, rate)
+        sample_weight = torch.HalfTensor([1.0, rate]).cuda()
+
+        cached_train_features_file = os.path.join(args.data_dir, 'train_{0}_{1}_{2}'.format(
+            list(filter(None, args.bert_model.split('/'))).pop(),
+            str(args.max_seq_length),
+            str(task_name)))
+        print(cached_train_features_file)
+        try:
+            with open(cached_train_features_file, "rb") as reader:
+                train_features = pickle.load(reader)
+        except:
+            train_features = convert_examples_to_features(train_examples, label_list, args.max_seq_length, tokenizer)
+            if args.local_rank == -1 or torch.distributed.get_rank() == 0:
+                logger.info("  Saving train features into cached file %s", cached_train_features_file)
+                with open(cached_train_features_file, "wb") as writer:
+                    pickle.dump(train_features, writer)
+
         
         all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
@@ -462,7 +489,19 @@ def main():
         for e in range(int(args.num_train_epochs)):
             model.load_state_dict(torch.load(os.path.join(args.output_dir, WEIGHTS_NAME+str(e))))
             eval_examples = processor.get_dev_examples(args.data_dir)
-            eval_features = convert_examples_to_features(eval_examples, label_list, args.max_seq_length, tokenizer)
+            cached_eval_features_file = os.path.join(args.data_dir, 'dev_{0}_{1}_{2}'.format(
+                list(filter(None, args.bert_model.split('/'))).pop(),
+                str(args.max_seq_length),
+                str(task_name)))
+            try:
+                with open(cached_eval_features_file, "rb") as reader:
+                    eval_features = pickle.load(reader)
+            except:
+                eval_features = convert_examples_to_features(eval_examples, label_list, args.max_seq_length, tokenizer)
+                if args.local_rank == -1 or torch.distributed.get_rank() == 0:
+                    logger.info("  Saving eval features into cached file %s", cached_eval_features_file)
+                    with open(cached_eval_features_file, "wb") as writer:
+                        pickle.dump(eval_features, writer)
 
             logger.info("***** Running evaluation *****")
             logger.info("  Num examples = %d", len(eval_examples))
