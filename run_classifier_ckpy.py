@@ -263,7 +263,7 @@ def main():
                 logger.info("  Saving train features into cached file %s", cached_train_features_file)
                 with open(cached_train_features_file, "wb") as writer:
                     pickle.dump(train_features, writer)
-        print(len(train_features))
+
         all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
@@ -272,7 +272,7 @@ def main():
             all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.long)
         elif output_mode == "regression":
             all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.float)
-        print(len(all_input_ids))
+
         train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
         if args.local_rank == -1:
             train_sampler = RandomSampler(train_data)
@@ -399,6 +399,7 @@ def main():
         for e in range(int(args.num_train_epochs)):
             model.load_state_dict(torch.load(os.path.join(args.output_dir, WEIGHTS_NAME+str(e))))
             model.to(device)
+            print("Loading From: ", os.path.join(args.output_dir, WEIGHTS_NAME + str(e)))
             eval_examples = processor.get_dev_examples(args.data_dir)
             cached_eval_features_file = os.path.join(args.data_dir, 'dev_{0}_{1}_{2}'.format(
                 list(filter(None, args.bert_model.split('/'))).pop(),

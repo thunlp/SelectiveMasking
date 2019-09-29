@@ -36,16 +36,25 @@ else
   fi
 fi
 
+MODE=rule
+
 # INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/
 INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_yelp/
-OUTPUT_DIR=/home/gyx/nvidia-bert/data/yelp_mask_test/hdf5_shards
-#BERT_MODEL=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/uncase
+OUTPUT_DIR=/home/gyx/nvidia-bert/data/yelp_test/hdf5_shards
+
+# BERT_MODEL=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/uncase
 # BERT_MODEL=/home/gyx/nvidia-bert/outputs/yelp_first/uncase_8000/
-BERT_MODEL=/home/gyx/nvidia-bert/results/yelp_all_rand_10dup/finetune/ckpt_60000/
+# BERT_MODEL=/home/gyx/nvidia-bert/results/yelp_all_rand_10dup/finetune/ckpt_60000/
+BERT_MODEL=/home/gyx/nvidia-bert/results/yelp_all_rand_10dup/finetune/temp/
 # BERT_MODEL=../outputs/yelp_second/uncase_25000/
 # BERT_MODEL=../outputs/yelp_full
+
+# BERT_MODEL=/home/gyx/nvidia-bert/results/yelp_all_rand_10dup/mask_gen/
+# OUTPUT_DIR=/home/gyx/nvidia-bert/data/yelp_model_mask/hdf5_shards
+# OUTPUT_DIR=/home/gyx/nvidia-bert/data/yelp_mask_info/hdf5_shards
+
 TOP_SEN_RATE=1
-THRESHOLD=0.02
+THRESHOLD=0.05
 LOWER_CASE_SWITCH=""
 if [ "$DO_LOWER_CASE" = true ] ; then
   LOWER_CASE_SWITCH="--do_lower_case" 

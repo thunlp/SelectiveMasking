@@ -129,7 +129,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
     # label_map = {label: i for i, label in enumerate(label_list, 1)}
 
     features = []
-    for (ex_index, example) in enumerate(examples):
+    for (ex_index, example) in enumerate(tqdm(examples, desc="processing")):
         tokens = example.text_a
         labels = example.label
         if len(tokens) >= max_seq_length - 1:
@@ -176,73 +176,6 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
                                       segment_ids=segment_ids,
                                       label_id=label_ids))
     return features
-
-
-def evaluate(model, data_dir, eval_type, processor, tokenizer, max_seq_length, label_list, eval_batch_size, device):
-    if eval_type == "test":
-        eval_examples = processor.get_test_examples(data_dir)
-    else:
-        eval_examples = processor.get_dev_examples(data_dir)
-
-    eval_features = convert_examples_to_features(
-        eval_examples, label_list, max_seq_length, tokenizer)
-    logger.info("***** Running evaluation *****")
-    logger.info("  Num examples = %d", len(eval_examples))
-    logger.info("  Batch size = %d", eval_batch_size)
-    all_input_ids = torch.tensor(
-        [f.input_ids for f in eval_features], dtype=torch.long)
-    all_input_mask = torch.tensor(
-        [f.input_mask for f in eval_features], dtype=torch.long)
-    all_segment_ids = torch.tensor(
-        [f.segment_ids for f in eval_features], dtype=torch.long)
-    all_label_ids = torch.tensor(
-        [f.label_id for f in eval_features], dtype=torch.long)
-    eval_data = TensorDataset(all_input_ids, all_input_mask,
-                              all_segment_ids, all_label_ids)
-    # Run prediction for full data
-    eval_sampler = SequentialSampler(eval_data)
-    eval_dataloader = DataLoader(
-        eval_data, sampler=eval_sampler, batch_size=eval_batch_size)
-    model.eval()
-    eval_loss, eval_accuracy = 0, 0
-    nb_eval_steps, nb_eval_examples = 0, 0
-    y_true = []
-    y_pred = []
-    label_map = {i: label for i, label in enumerate(label_list, 1)}
-    for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
-        input_ids = input_ids.to(device)
-        input_mask = input_mask.to(device)
-        segment_ids = segment_ids.to(device)
-        label_ids = label_ids.to(device)
-
-        with torch.no_grad():
-            logits = model(input_ids, segment_ids, input_mask)
-
-        logits = torch.argmax(F.log_softmax(logits, dim=2), dim=2)
-        logits = logits.detach().cpu().numpy()
-        label_ids = label_ids.to('cpu').numpy()
-        input_mask = input_mask.to('cpu').numpy()
-
-        # for i, label in enumerate(label_ids):
-        #     temp_1 = []
-        #     temp_2 = []
-        #     for j, m in enumerate(label):
-        #         if j == 0:
-        #             continue
-        #         elif label_ids[i][j] == 11:
-        #             y_true.append(temp_1)
-        #             y_pred.append(temp_2)
-        #             break
-        #         else:
-        #             temp_1.append(label_ids[i][j])
-        #             temp_2.append(logits[i][j])
-
-    y_true = [[str(x) for x in L] for L in label_ids]
-    y_pred = [[str(x) for x in L] for L in logits]
-    report = classification_report(y_true, y_pred, digits=4)
-    f_score = f1_score(y_true, y_pred)
-    return report, f_score
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -337,8 +270,7 @@ def main():
                              "Positive power of 2: static loss scaling value.\n")
     args = parser.parse_args()
 
-    max_f1_score = 0
-
+    sample_weight = torch.HalfTensor([100.0, 1.0]).cuda()
     processors = {"maskgen": MaskGenProcessor}
 
     if args.local_rank == -1 or args.no_cuda:
@@ -363,10 +295,8 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-
     if not args.do_train and not args.do_eval:
-        raise ValueError(
-            "At least one of `do_train` or `do_eval` must be True.")
+        raise ValueError("At least one of `do_train` or `do_eval` must be True.")
 
     if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train:
         raise ValueError(
@@ -380,30 +310,25 @@ def main():
         raise ValueError("Task not found: %s" % (task_name))
 
     processor = processors[task_name]()
+
     label_list = processor.get_labels()
     num_labels = len(label_list)
+
+    if args.local_rank not in [-1, 0]:
+        # Make sure only the first process in distributed training will download model & vocab
+        torch.distributed.barrier()
 
     if args.vocab_file:
         tokenizer = BertTokenizer(args.vocab_file, args.do_lower_case)
     else:
-        tokenizer = BertTokenizer.from_pretrained(
-            args.bert_model, do_lower_case=args.do_lower_case)
-
-    train_examples = None
-    num_train_optimization_steps = None
-    if args.do_train:
-        train_examples = processor.get_train_examples(args.data_dir)
-        num_train_optimization_steps = int(
-            len(train_examples) / args.train_batch_size / args.gradient_accumulation_steps) * args.num_train_epochs
-        if args.local_rank != -1:
-            num_train_optimization_steps = num_train_optimization_steps // torch.distributed.get_world_size()
+        tokenizer = BertTokenizer.from_pretrained(args.bert_model, do_lower_case=args.do_lower_case)
 
     # Prepare model
-    cache_dir = args.cache_dir if args.cache_dir else os.path.join(
-        str(PYTORCH_PRETRAINED_BERT_CACHE), 'distributed_{}'.format(args.local_rank))
-    model = BertForTokenClassification.from_pretrained(args.bert_model,
-                                cache_dir=cache_dir,
-                                num_labels=num_labels)
+    model = BertForTokenClassification.from_pretrained(args.bert_model, num_labels=num_labels)
+    
+    if args.local_rank == 0:
+        torch.distributed.barrier()
+    
     if args.fp16:
         model.half()
     model.to(device)
@@ -414,19 +339,40 @@ def main():
             raise ImportError(
                 "Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
 
-        model = DDP(model)
+        model = DDP(model, device_ids=[args.local_rank], output_device=args.local_rank, find_unused_parameters=True)
     elif n_gpu > 1:
         model = torch.nn.DataParallel(model)
 
-    param_optimizer = list(model.named_parameters())
-    no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in param_optimizer if not any(
-            nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in param_optimizer if any(
-            nd in n for nd in no_decay)], 'weight_decay': 0.0}
-    ]
+    global_step = 0
+    nb_tr_steps = 0
+    tr_loss = 0
+
+    train_examples = None
+    num_train_optimization_steps = None
     if args.do_train:
+        train_examples = processor.get_train_examples(args.data_dir)
+        train_features = convert_examples_to_features(train_examples, label_list, args.max_seq_length, tokenizer)
+        
+        all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
+        all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
+        all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
+        all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.long)
+        train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+        
+        if args.local_rank == -1:
+            train_sampler = RandomSampler(train_data)
+        else:
+            train_sampler = DistributedSampler(train_data)
+        train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.train_batch_size)
+
+        num_train_optimization_steps = len(train_dataloader) // args.gradient_accumulation_steps * args.num_train_epochs
+
+        param_optimizer = list(model.named_parameters())
+        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        optimizer_grouped_parameters = [
+            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+            {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ]
         if args.fp16:
             try:
                 from apex.optimizers import FP16_Optimizer
@@ -442,8 +388,7 @@ def main():
             if args.loss_scale == 0:
                 optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
             else:
-                optimizer = FP16_Optimizer(
-                    optimizer, static_loss_scale=args.loss_scale)
+                optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
 
         else:
             optimizer = BertAdam(optimizer_grouped_parameters,
@@ -451,43 +396,23 @@ def main():
                                  warmup=args.warmup_proportion,
                                  t_total=num_train_optimization_steps)
 
-    global_step = 0
-    nb_tr_steps = 0
-    tr_loss = 0
-    label_map = {i: label for i, label in enumerate(label_list, 1)}
-    if args.do_train:
-        train_features = convert_examples_to_features(
-            train_examples, label_list, args.max_seq_length, tokenizer)
+
+        label_map = {i: label for i, label in enumerate(label_list, 1)}
+        
         logger.info("***** Running training *****")
         logger.info("  Num examples = %d", len(train_examples))
         logger.info("  Batch size = %d", args.train_batch_size)
         logger.info("  Num steps = %d", num_train_optimization_steps)
-        all_input_ids = torch.tensor(
-            [f.input_ids for f in train_features], dtype=torch.long)
-        all_input_mask = torch.tensor(
-            [f.input_mask for f in train_features], dtype=torch.long)
-        all_segment_ids = torch.tensor(
-            [f.segment_ids for f in train_features], dtype=torch.long)
-        all_label_ids = torch.tensor(
-            [f.label_id for f in train_features], dtype=torch.long)
-        train_data = TensorDataset(all_input_ids, all_input_mask,
-                                   all_segment_ids, all_label_ids)
-        if args.local_rank == -1:
-            train_sampler = RandomSampler(train_data)
-        else:
-            train_sampler = DistributedSampler(train_data)
-        train_dataloader = DataLoader(
-            train_data, sampler=train_sampler, batch_size=args.train_batch_size)
 
         # warmup_linear = WarmupLinearSchedule(warmup=args.warmup_proportion, t_total=num_train_optimization_steps)
-        for _ in trange(int(args.num_train_epochs), desc="Epoch"):
-            model.train()
+        model.train()
+        for e in trange(int(args.num_train_epochs), desc="Epoch"):
             tr_loss = 0
             nb_tr_examples, nb_tr_steps = 0, 0
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 batch = tuple(t.to(device) for t in batch)
                 input_ids, input_mask, segment_ids, label_ids = batch
-                loss = model(input_ids, segment_ids, input_mask, label_ids)
+                loss = model(input_ids, segment_ids, input_mask, label_ids, weight=sample_weight)
                 if n_gpu > 1:
                     loss = loss.mean()  # mean() to average on multi-gpu.
                 if args.gradient_accumulation_steps > 1:
@@ -505,52 +430,95 @@ def main():
                     if args.fp16:
                         # modify learning rate with special warm up BERT uses
                         # if args.fp16 is False, BertAdam is used that handles this automatically
-                        lr_this_step = args.learning_rate * \
-                            warmup_linear(global_step, args.warmup_proportion)
+                        lr_this_step = args.learning_rate * warmup_linear(global_step, args.warmup_proportion)
                         for param_group in optimizer.param_groups:
                             param_group['lr'] = lr_this_step
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
-            # if args.local_rank == -1 or torch.distributed.get_rank() == 0:
-            report, f_score = evaluate(model, args.data_dir, "dev", processor, tokenizer,
-                                       args.max_seq_length, label_list, args.eval_batch_size, device)
-            if f_score > max_f1_score:
-                max_f1_score = f_score
-                logger.info("*** Better Dev Results *****")
-                logger.info("\n%s", report)
-                # Save a trained model and the associated configuration
-                model_to_save = model.module if hasattr(
-                    model, 'module') else model  # Only save the model it-self
-                output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME)
-                torch.save(model_to_save.state_dict(), output_model_file)
-                output_config_file = os.path.join(args.output_dir, CONFIG_NAME)
-                with open(output_config_file, 'w') as f:
-                    f.write(model_to_save.config.to_json_string())
-                label_map = {i: label for i, label in enumerate(label_list, 1)}
-                model_config = {"bert_model": args.bert_model, "do_lower": args.do_lower_case,
-                                "max_seq_length": args.max_seq_length, "num_labels": len(label_list) + 1, "label_map": label_map}
-                json.dump(model_config, open(os.path.join(
-                    args.output_dir, "model_config.json"), "w"))
-    # Load a trained model and config that you have fine-tuned
-    else:
-        output_config_file = os.path.join(args.output_dir, CONFIG_NAME)
+            model_to_save = model.module if hasattr(model, 'module') else model
+            output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME+str(e))
+            torch.save(model_to_save.state_dict(), output_model_file)
+
+    if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
+        model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
+
         output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME)
-        config = BertConfig(output_config_file)
-        model = BertForTokenClassification(config, num_labels=num_labels)
-        model.load_state_dict(torch.load(output_model_file))
+        output_config_file = os.path.join(args.output_dir, CONFIG_NAME)
+
+        torch.save(model_to_save.state_dict(), output_model_file)
+        with open(output_config_file, 'w') as f:
+            f.write(model_to_save.config.to_json_string())
+
+        output_args_file = os.path.join(args.output_dir, 'training_args.bin')
+        torch.save(args, output_args_file)
+    else:
+        model = BertForTokenClassification.from_pretrained(args.bert_model, num_labels=num_labels)
+
 
     model.to(device)
 
     if args.do_eval and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-        report, f1_score = evaluate(model, args.data_dir, "test", processor,
-                                    tokenizer, args.max_seq_length, label_list, args.eval_batch_size, device)
-        logger.info("\n%s", report)
-        output_eval_file = os.path.join(args.output_dir, "eval_results.txt")
-        with open(output_eval_file, "w") as writer:
-            logger.info("***** Eval results *****")
-            logger.info("\n%s", report)
-            writer.write(report)
+        for e in range(int(args.num_train_epochs)):
+            model.load_state_dict(torch.load(os.path.join(args.output_dir, WEIGHTS_NAME+str(e))))
+            eval_examples = processor.get_dev_examples(args.data_dir)
+            eval_features = convert_examples_to_features(eval_examples, label_list, args.max_seq_length, tokenizer)
+
+            logger.info("***** Running evaluation *****")
+            logger.info("  Num examples = %d", len(eval_examples))
+            logger.info("  Batch size = %d", args.eval_batch_size)
+            all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
+            all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
+            all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
+            all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.long)
+
+            eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+            # Run prediction for full data
+            if args.local_rank == -1:
+                eval_sampler = SequentialSampler(eval_data)
+            else:
+                eval_sampler = DistributedSampler(eval_data)  # Note that this sampler samples randomly
+            eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=args.eval_batch_size)
+
+            model.eval()
+            eval_loss = 0
+            nb_eval_steps = 0
+            preds = []
+            out_label_ids = None
+
+            for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
+                input_ids = input_ids.to(device)
+                input_mask = input_mask.to(device)
+                segment_ids = segment_ids.to(device)
+                label_ids = label_ids.to(device)
+
+                with torch.no_grad():
+                    logits = model(input_ids, segment_ids, input_mask)
+
+                logits = torch.argmax(F.log_softmax(logits, dim=2), dim=2)
+                logits = logits.detach().cpu().numpy()
+                label_ids = label_ids.to('cpu').numpy()
+                input_mask = input_mask.to('cpu').numpy()
+
+            y_true = [[str(x) for x in L] for L in label_ids]
+            y_pred = [[str(x) for x in L] for L in logits]
+
+            all_tokens = 0
+            right_tokens = 0
+            right_zero_tokens = 0
+            zero_tokens = 0
+            for (t, p) in zip(y_true, y_pred):
+                for tt, pp in zip(t, p):
+                    right_tokens += int(tt == pp)
+                    all_tokens += 1
+                    zero_tokens += int(pp == 0)
+                    right_zero_tokens == int(tt == 0)
+            
+            print("Result: {}/{}".format(right_tokens, all_tokens))
+            print("Zero tokens: {}/{}".format(zero_tokens, all_tokens))
+            print("Right zero tokens: {}/{}".format(right_zero_tokens, all_tokens))
+            # report = classification_report(y_true, y_pred, digits=4)
+            # f_score = f1_score(y_true, y_pred)
 
 
 if __name__ == "__main__":

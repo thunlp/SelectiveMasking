@@ -5,15 +5,16 @@ ITER=$1
 
 python3 run_classifier_ckpy.py \
     --bert_model=pretrain_bert_model/bert-base-uncased/ \
+    --do_train \
     --do_eval \
     --task_name=yelp     \
     --data_dir=${YELP_DIR}/  \
-    --output_dir=results/yelp_all_rand_10dup/finetune/ckpt_${ITER}  \
+    --output_dir=results/yelp_all/finetune/ckpt_${ITER}  \
     --max_seq_length=256   \
     --train_batch_size=32 \
     --num_train_epochs=3 \
     --learning_rate=2e-5 \
     --do_lower_case \
-    --ckpt=results/yelp_second/checkpoints/ckpt_${ITER}.pt \
     --fp16 \
     --gradient_accumulation_steps 2
+    # --ckpt=results/yelp_all_rand_10dup/finetune/ckpt_${ITER}.pt \

@@ -24,4 +24,5 @@ PART=$1
   --part $PART \
   --threshold=${THRESHOLD} \
   --max_proc=${N_PROCS_PREPROCESS} \
+  --mode=${MODE} \
   ${LOWER_CASE_SWITCH} 

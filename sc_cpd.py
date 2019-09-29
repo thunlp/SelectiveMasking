@@ -34,7 +34,7 @@ import random
 import collections
 import mask_utils.mask_generators as mask_generators
 from run_classifier_dataset_utils import processors
-from sc_mask_gen import SC
+from sc_mask_gen import SC, ModelGen
 from rand_mask_gen import RandMask
 
 
@@ -307,8 +307,9 @@ def main():
     ## Other parameters
 
     # bool
-    parser.add_argument("--rand_gen", 
-                        action="store_true")
+    parser.add_argument("--mode", 
+                        type=str,
+                        )
 
     # str
     parser.add_argument("--bert_model", 
@@ -401,10 +402,15 @@ def main():
     label_list = processor.get_labels()
     logger.info("Bert Model: " + args.bert_model)
     print(torch.cuda.is_available())
-    if args.rand_gen:
+    if args.mode == "rand":
+        print("Mode: rand")
         generator = RandMask(args.masked_lm_prob, args.bert_model, args.do_lower_case, args.max_seq_length)
-    else:    
+    elif args.mode == "rule":
+        print("Mode: rule", )    
         generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
+    else:
+        print("Mode: model")
+        generator = ModelGen(args.masked_lm_prob, args.bert_model, args.do_lower_case, args.max_seq_length, args.sentence_batch_size)
     # input_files = []
     # print(args.part)
     instances, labeled_data = create_training_instances(
