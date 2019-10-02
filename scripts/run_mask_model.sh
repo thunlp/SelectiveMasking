@@ -1,6 +1,6 @@
 # DATA_DIR=/home/gyx/nvidia-bert/data/yelp_mask_test/hdf5_shards/merged
-# DATA_DIR=/home/gyx/nvidia-bert/data/yelp_mask_info/hdf5_shards/merged
-DATA_DIR=/home/gyx/nvidia-bert/data/small-yelp_mask_info/
+DATA_DIR=/home/gyx/nvidia-bert/data/yelp_mask_info/hdf5_shards/merged
+# DATA_DIR=/home/gyx/nvidia-bert/data/small-yelp_mask_info/
 
 BERT_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/
 

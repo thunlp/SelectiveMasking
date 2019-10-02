@@ -303,7 +303,7 @@ class SC(nn.Module):
 class ModelGen(nn.Module):
     def __init__(self, mask_rate, bert_model, do_lower_case, max_seq_length, sen_batch_size, use_gpu=True):
         super(ModelGen, self).__init__()
-        self.mask_rate = mask_rate # bert 里面的mask_rate，现在没有用
+        self.mask_rate = mask_rate
         self.max_seq_length = max_seq_length # bert里面的max_seq_length
         self.tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=do_lower_case)
         self.model = BertForTokenClassification.from_pretrained(bert_model, num_labels=2)
@@ -317,6 +317,9 @@ class ModelGen(nn.Module):
     
     def create_mask(self, mask_poses, sen, rng):
         # 根据需要mask的位置生成mask
+        print([sen[pos] for pos in mask_poses])
+        max_mask_num = int(max(1, self.mask_rate * len(sen)))
+        mask_poses = mask_poses[0:max_mask_num]
         masked_info = [{} for token in sen]
         for pos in mask_poses:
             if rng.random() < 0.8:
@@ -375,8 +378,13 @@ class ModelGen(nn.Module):
             with torch.no_grad():
                 logits = self.model(input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
             
-            logits = torch.argmax(logits, dim=2)
-            preds.extend(logits.detach().cpu().numpy())
+            res = torch.argmax(logits, dim=2).detach().cpu().numpy()
+            logits = logits.detach().cpu().numpy()
+            for r, m, l in zip(res, input_mask, logits):
+                t = [(rr, ll[rr]) for mm, rr, ll in zip(m[1:-1], r[1:-1], l[1:-1]) if mm == 1]
+                preds.append(t)
+            # logits = [[ll for mm, ll in zip(m[1:-1], l[1:-1]) if mm == 1] for m, l in zip(input_mask, logits)]
+            # preds.extend(logits)
 
         return preds
 
@@ -406,9 +414,9 @@ class ModelGen(nn.Module):
             for doc_id in tqdm(range(doc_num), desc="Generating All Documents"):
                 all_documents.append([])
                 while i < len(sen_doc_ids) and doc_id == sen_doc_ids[i]:
-                    mask_poses = [pos for (pos, pred) in enumerate(preds[i]) if pred == 1]
-                    print(mask_poses)
-                    m_info = self.create_mask(mask_poses, sentences[i], rng)
+                    mask_poses = [(pos, pred[1]) for (pos, pred) in enumerate(preds[i]) if pred[0] == 1]
+                    mask_poses = sorted(mask_poses, key=lambda x: x[1], reverse=True)
+                    m_info = self.create_mask([pos for pos, _ in mask_poses], sentences[i], rng)
                     all_documents[-1].append(MaskedTokenInstance(
                         tokens=sentences[i], info=m_info))
                     i += 1

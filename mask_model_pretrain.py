@@ -362,7 +362,7 @@ def main():
 
         rate = zeros_num / ones_num
         print("statistic: ", zeros_num, ones_num, rate)
-        sample_weight = torch.HalfTensor([1.0, rate]).cuda()
+        sample_weight = torch.HalfTensor([1.0, 25]).cuda()
 
         cached_train_features_file = os.path.join(args.data_dir, 'train_{0}_{1}_{2}'.format(
             list(filter(None, args.bert_model.split('/'))).pop(),
@@ -457,12 +457,17 @@ def main():
                     if args.fp16:
                         # modify learning rate with special warm up BERT uses
                         # if args.fp16 is False, BertAdam is used that handles this automatically
-                        lr_this_step = args.learning_rate * warmup_linear(global_step, args.warmup_proportion)
+                        lr_this_step = args.learning_rate * warmup_linear(global_step / num_train_optimization_steps, args.warmup_proportion)
                         for param_group in optimizer.param_groups:
                             param_group['lr'] = lr_this_step
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
+                
+                if step % 100 == 0:
+                    print("\n")
+                    print(tr_loss / (step + 1))
+                    print("\n")
             model_to_save = model.module if hasattr(model, 'module') else model
             output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME+str(e))
             torch.save(model_to_save.state_dict(), output_model_file)
@@ -509,7 +514,7 @@ def main():
             all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
             all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
             all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
-            all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.long)
+            all_label_ids = torch.tensor([f.label_id for f in eval_features], dtype=torch.long)
 
             eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
             # Run prediction for full data
@@ -525,6 +530,11 @@ def main():
             preds = []
             out_label_ids = None
 
+            all_tokens = 0
+            right_tokens = 0
+            right_zero_tokens = 0
+            zero_tokens = 0
+
             for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
                 input_ids = input_ids.to(device)
                 input_mask = input_mask.to(device)
@@ -539,19 +549,16 @@ def main():
                 label_ids = label_ids.to('cpu').numpy()
                 input_mask = input_mask.to('cpu').numpy()
 
-            y_true = [[str(x) for x in L] for L in label_ids]
-            y_pred = [[str(x) for x in L] for L in logits]
+                y_true = [[str(x) for x in L] for L in label_ids]
+                y_pred = [[str(x) for x in L] for L in logits]
 
-            all_tokens = 0
-            right_tokens = 0
-            right_zero_tokens = 0
-            zero_tokens = 0
-            for (t, p) in zip(y_true, y_pred):
-                for tt, pp in zip(t, p):
-                    right_tokens += int(tt == pp)
-                    all_tokens += 1
-                    zero_tokens += int(pp == 0)
-                    right_zero_tokens == int(tt == 0)
+                for (m, t, p) in zip(input_mask, y_true, y_pred):
+                    for mm, tt, pp in zip(m, t, p):
+                        if mm == 1:
+                            right_tokens += int(tt == pp)
+                            all_tokens += 1
+                            zero_tokens += int(pp == '0')
+                            right_zero_tokens += int(tt == '0')
             
             print("Result: {}/{}".format(right_tokens, all_tokens))
             print("Zero tokens: {}/{}".format(zero_tokens, all_tokens))
