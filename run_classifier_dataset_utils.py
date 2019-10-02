@@ -274,6 +274,58 @@ class YelpProcessor(DataProcessor):
             examples.append(InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
         return examples
 
+class AmazonProcessor(DataProcessor):
+    """Processor for the Yelp data set"""
+    def get_train_examples(self, data_dir):
+        """See base class"""
+        print("get train examples")
+        return self._create_examples(
+            self._read_tsv(os.path.join(data_dir, "train.csv"), quotechar='"', delimiter=','), "train")
+
+    def get_pretrain_examples(self, data_dir, part, max_proc):
+        """See base class"""
+        print(part)
+        print(max_proc)
+        lines = self._read_tsv(os.path.join(data_dir, "train.csv"), quotechar='"', delimiter=',')
+        data_size = len(lines)
+        part_size = data_size // max_proc
+        begin = 0
+        end = data_size
+        if part >= 0:
+            begin = part*part_size
+            end = (part+1)*part_size
+            # print(begin, end)
+            # if end - begin < 1000:
+                # begin = 0
+                # end = data_size
+            if part == max_proc - 1:
+                end = data_size
+        examples = []
+        for i, line in enumerate(lines[begin:end]):
+            label = line[0]
+            text_a = line[1] + ". " + line[2]
+            examples.append(InputExample(guid=i, text_a=text_a, text_b=None, label=label))
+        return examples
+
+
+    def get_dev_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "dev.csv"), quotechar='"', delimiter=','), "dev")
+
+    def get_labels(self):
+        """See base class."""
+        return ['1', '2', '3', '4', '5']
+
+    def _create_examples(self, lines, set_type):
+        """Creates examples for the training and dev sets."""
+        examples = []
+        for (i, line) in enumerate(lines):
+            guid = "%s-%s" % (set_type, i)
+            text_a = line[1] + ". " + line[2]
+            label = line[0]
+            examples.append(InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+        return examples
+
 class StsbProcessor(DataProcessor):
     """Processor for the STS-B data set (GLUE version)."""
 
@@ -595,6 +647,8 @@ def compute_metrics(task_name, preds, labels):
         return {"acc": simple_accuracy(preds, labels)}
     elif task_name == "yelp":
         return {"acc": simple_accuracy(preds, labels)}
+    elif task_name == "amazon":
+        return {"acc": simple_accuracy(preds, labels)}
     else:
         raise KeyError(task_name)
 
@@ -609,7 +663,8 @@ processors = {
     "qnli": QnliProcessor,
     "rte": RteProcessor,
     "wnli": WnliProcessor,
-    "yelp": YelpProcessor
+    "yelp": YelpProcessor,
+    "amazon": AmazonProcessor
 }
 
 output_modes = {
@@ -622,5 +677,6 @@ output_modes = {
     "qnli": "classification",
     "rte": "classification",
     "wnli": "classification",
-    "yelp": "classification"
+    "yelp": "classification",
+    "amazon": AmazonProcessor
 }

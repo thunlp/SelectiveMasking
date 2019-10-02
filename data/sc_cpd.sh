@@ -18,7 +18,7 @@ PART=$1
   --random_seed=${SEED} \
   --dupe_factor=${DUPE_FACTOR} \
   --bert_model=${BERT_MODEL} \
-  --task_name="yelp" \
+  --task_name=${TASK_NAME} \
   --gpus=${N_PROCS_PREPROCESS} \
   --top_sen_rate=${TOP_SEN_RATE} \
   --part $PART \

@@ -317,7 +317,8 @@ class ModelGen(nn.Module):
     
     def create_mask(self, mask_poses, sen, rng):
         # 根据需要mask的位置生成mask
-        print([sen[pos] for pos in mask_poses])
+        # print(sen)
+        # print([sen[pos] for pos in mask_poses])
         max_mask_num = int(max(1, self.mask_rate * len(sen)))
         mask_poses = mask_poses[0:max_mask_num]
         masked_info = [{} for token in sen]

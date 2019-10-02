@@ -37,10 +37,13 @@ else
 fi
 
 MODE=model
+TASK_NAME=amazon
 
 # INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/
-INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_yelp/
-OUTPUT_DIR=/home/gyx/nvidia-bert/data/yelp_test/hdf5_shards
+# INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_yelp/
+INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_amazon/
+
+OUTPUT_DIR=/home/gyx/nvidia-bert/data/amazon_test/hdf5_shards
 
 # model to generate mask trainning sets
 # BERT_MODEL=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/uncase
