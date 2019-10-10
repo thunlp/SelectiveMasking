@@ -308,9 +308,11 @@ class ModelGen(nn.Module):
         self.tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=do_lower_case)
         self.model = BertForTokenClassification.from_pretrained(bert_model, num_labels=2)
         self.device = torch.device("cuda" if torch.cuda.is_available() and use_gpu else "cpu")
+        print(self.device)
         self.model.to(self.device)
         self.n_gpu = torch.cuda.device_count()
         self.sen_batch_size = sen_batch_size # 给sentence 分类的时候的batch_size
+        print(sen_batch_size)
         self.vocab = list(self.tokenizer.vocab.keys())
         if self.n_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)

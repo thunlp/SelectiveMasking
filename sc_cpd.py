@@ -345,7 +345,7 @@ def main():
                         type=int,
                         help="Maximum sequence length.")
     parser.add_argument("--sentence_batch_size",
-                        default=8, 
+                        default=128, 
                         type=int)
     parser.add_argument("--top_sen_rate",
                         default=0.8,
@@ -424,7 +424,8 @@ def main():
         output_file = os.path.join(args.output_dir, "0.hdf5") 
         labeled_output_file = os.path.join(args.output_dir, "0.pkl")
     write_instance_to_example_file(instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, output_file)
-    write_labeled_data(labeled_data, labeled_output_file)
+    if args.task_name == "rule":
+        write_labeled_data(labeled_data, labeled_output_file)
 
 if __name__ == "__main__":
     main()

@@ -414,7 +414,7 @@ def main():
 
                                 
                         most_recent_ckpts_paths.append(output_save_file)
-                        if len(most_recent_ckpts_paths) > 8:
+                        if len(most_recent_ckpts_paths) > 1000:
                             ckpt_to_be_removed = most_recent_ckpts_paths.pop(0)
                             os.remove(ckpt_to_be_removed)
 
@@ -422,8 +422,8 @@ def main():
                         tr_loss = tr_loss * args.gradient_accumulation_steps / training_steps
                         if (torch.distributed.is_initialized()):
                             tr_loss /= torch.distributed.get_world_size()
-                            torch.distributed.all_reduce(tr_loss)
-                        logger.info("Total Steps:{} Final Loss = {}".format(training_steps, tr_loss.item()))
+                            torch.distributed.all_reduce(torch.tensor(tr_loss).cuda())
+                        logger.info("Total Steps:{} Final Loss = {}".format(training_steps, tr_loss))
                         return
             del train_dataloader
             del train_sampler

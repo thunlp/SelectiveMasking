@@ -216,6 +216,7 @@ def main():
     model = BertForSequenceClassification.from_pretrained(args.bert_model, num_labels=num_labels)
 
     if args.ckpt:
+        print("load from", args.ckpt)
         model_dict = model.state_dict()
         ckpt = torch.load(args.ckpt)
         pretrained_dict = ckpt['model']
