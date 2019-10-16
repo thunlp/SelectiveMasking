@@ -16,13 +16,13 @@ seed=${12:-42}
 job_name=${13:-"job"}
 
 
-DATASET=merged_amazon_yelp # change this for other datasets
+DATASET=amazon_mr_model_gen_1 # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
 BERT_CONFIG=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
 LOAD_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
-RESULTS_DIR=/home/gyx/nvidia-bert/results/model_gen_amazon_merge
-CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/model_gen_amazon_merge/checkpoints
+RESULTS_DIR=/home/gyx/nvidia-bert/results/mr_model_gen_amazon_2
+CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/mr_model_gen_amazon_2/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 

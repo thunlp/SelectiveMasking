@@ -9,7 +9,7 @@ echo "Output dir: ${OUTPUT_DIR}"
 
 PART=$1
 # echo $INPUT_DIR
- CUDA_VISIBLE_DEVICES=$1 python3 ../sc_cpd.py \
+CUDA_VISIBLE_DEVICES=$1 python3 ../sc_cpd.py \
   --input_dir=${INPUT_DIR} \
   --output_dir=${OUTPUT_DIR} \
   --max_seq_length=${MAX_SEQUENCE_LENGTH} \
@@ -25,4 +25,5 @@ PART=$1
   --threshold=${THRESHOLD} \
   --max_proc=${N_PROCS_PREPROCESS} \
   --mode=${MODE} \
-  ${LOWER_CASE_SWITCH} 
+  ${LOWER_CASE_SWITCH} \
+  ${WITH_RAND}

@@ -362,7 +362,7 @@ def main():
 
         rate = zeros_num / ones_num
         print("statistic: ", zeros_num, ones_num, rate)
-        sample_weight = torch.HalfTensor([1.0, 25]).cuda()
+        sample_weight = torch.HalfTensor([1.0, 1.0]).cuda()
 
         cached_train_features_file = os.path.join(args.data_dir, 'train_{0}_{1}_{2}'.format(
             list(filter(None, args.bert_model.split('/'))).pop(),
