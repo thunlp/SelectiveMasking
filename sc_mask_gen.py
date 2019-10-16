@@ -301,7 +301,7 @@ class SC(nn.Module):
         return all_documents
 
 class ModelGen(nn.Module):
-    def __init__(self, mask_rate, bert_model, do_lower_case, max_seq_length, sen_batch_size, with_rand=False, use_gpu=True):
+    def __init__(self, mask_rate, bert_model, do_lower_case, max_seq_length, sen_batch_size, split_part=-1, with_rand=False, use_gpu=True):
         super(ModelGen, self).__init__()
         self.mask_rate = mask_rate
         self.max_seq_length = max_seq_length # bert里面的max_seq_length
@@ -315,6 +315,7 @@ class ModelGen(nn.Module):
         print(sen_batch_size)
         self.vocab = list(self.tokenizer.vocab.keys())
         self.with_rand = with_rand
+        self.split_part = split_part
         if self.n_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
     
@@ -322,8 +323,8 @@ class ModelGen(nn.Module):
         # 根据需要mask的位置生成mask
         # print(sen)
         # print([sen[pos] for pos in mask_poses])
-        max_mask_num = int(max(1, self.mask_rate * len(sen)))
-        mask_poses = mask_poses[0:max_mask_num]
+        # max_mask_num = int(max(1, self.mask_rate * len(sen)))
+        # mask_poses = mask_poses[0:max_mask_num]
         masked_info = [{} for token in sen]
         for pos in mask_poses:
             if rng.random() < 0.8:
@@ -336,25 +337,6 @@ class ModelGen(nn.Module):
             masked_info[pos]["mask"] = mask_token
             masked_info[pos]["label"] = sen[pos]
         return masked_info
-
-    def create_rand_mask(self, mask_poses, sen, rng):
-        max_mask_num = min(len(mask_poses), int(max(1, self.mask_rate * len(sen))))
-        cand_indexes = [i for i in range(len(sen))]
-        rng.shuffle(cand_indexes)
-        rand_mask_poses = cand_indexes[0:max_mask_num]
-        masked_info = [{} for token in sen]
-        for pos in rand_mask_poses:
-            if rng.random() < 0.8:
-                mask_token = "[MASK]"
-            else:
-                if rng.random() < 0.5:
-                    mask_token = sen[pos]
-                else:
-                    mask_token = self.vocab[rng.randint(0, len(self.vocab) - 1)]
-            masked_info[pos]["mask"] = mask_token
-            masked_info[pos]["label"] = sen[pos]
-        return masked_info
-
 
     def convert_examples_to_features(self, data):
         features = []
@@ -442,11 +424,15 @@ class ModelGen(nn.Module):
                 while i < len(sen_doc_ids) and doc_id == sen_doc_ids[i]:
                     mask_poses = [(pos, pred[1]) for (pos, pred) in enumerate(preds[i]) if pred[0] == 1]
                     mask_poses = sorted(mask_poses, key=lambda x: x[1], reverse=True) # 按评分排序
-                    mask_poses = [pos for pos, _ in mask_poses]
+                    max_mask_num = int(max(1, self.mask_rate * len(sentences[i])))
+                    mask_poses = [pos for pos, _ in mask_poses[0:max_mask_num]]
                     m_info = self.create_mask(mask_poses, sentences[i], rng)
                     all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
                     if self.with_rand:
-                        rand_m_info = self.create_rand_mask(mask_poses, sentences[i], rng)
+                        cand_indexes = [i for i in range(len(sentences[i]))]
+                        rng.shuffle(cand_indexes)
+                        rand_mask_poses = cand_indexes[0:len(mask_poses)] #与mask_poses的长度保持一致
+                        rand_m_info = self.create_mask(rand_mask_poses, sentences[i], rng)
                         rand_all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=rand_m_info))
                     i += 1
                 print(all_documents[-1])

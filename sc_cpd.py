@@ -398,6 +398,9 @@ def main():
     parser.add_argument('--with_rand',
                         action='store_true'
                         )
+    parser.add_argument('--split_part',
+                        type=int
+                        )
 
     args = parser.parse_args()
     print(args)
