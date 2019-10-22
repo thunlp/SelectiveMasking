@@ -12,7 +12,7 @@ DO_LOWER_CASE=true
 DO_WITH_RAND=true
 N_LINES_PER_SHARD_APPROX=99000   # Default=396000 creates 256 shards
 
-N_PROCS_PREPROCESS=1    # Adjust this based on memory requirements and available number of cores
+N_PROCS_PREPROCESS=8    # Adjust this based on memory requirements and available number of cores
 
 BERT_BASE_DIR_CASED="/home/gyx/nvidia-bert/vocab/cased_L-12_H-768_A-12"
 BERT_LARGE_DIR_CASED="/home/gyx/nvidia-bert/vocab/cased_L-24_H-1024_A-16"
@@ -43,9 +43,9 @@ TASK_NAME=amazon
 # INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/
 # INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_yelp/
 
-INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_amazon/
+# INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_amazon/
 # INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/onem_amazon/
-# INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp1/
+INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp1/
 # INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp3/
 # INPUT_DIR=/home/gyx/nvidia-bert/data/rt-polaritydata/full
 

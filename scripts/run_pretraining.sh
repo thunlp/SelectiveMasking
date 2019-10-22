@@ -12,17 +12,17 @@ resume_training=${8:-"false"}
 create_logfile=${9:-"true"}
 accumulate_gradients=${10:-"false"}
 gradient_accumulation_steps=${11:-1}
-seed=${12:-42}
+seed=${12:-88}
 job_name=${13:-"job"}
 
 
-DATASET=amazon_mr_model_gen_1 # change this for other datasets
+DATASET=amazon_mr_model_gen_rand_r # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
 BERT_CONFIG=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
 LOAD_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
-RESULTS_DIR=/home/gyx/nvidia-bert/results/mr_model_gen_amazon_2
-CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/mr_model_gen_amazon_2/checkpoints
+RESULTS_DIR=/home/gyx/nvidia-bert/results/mr_model_gen_amazon_rand_88
+CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/mr_model_gen_amazon_rand_88/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 

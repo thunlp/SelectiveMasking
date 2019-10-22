@@ -301,7 +301,7 @@ class SC(nn.Module):
         return all_documents
 
 class ModelGen(nn.Module):
-    def __init__(self, mask_rate, bert_model, do_lower_case, max_seq_length, sen_batch_size, split_part=-1, with_rand=False, use_gpu=True):
+    def __init__(self, mask_rate, bert_model, do_lower_case, max_seq_length, sen_batch_size, with_rand=False, use_gpu=True):
         super(ModelGen, self).__init__()
         self.mask_rate = mask_rate
         self.max_seq_length = max_seq_length # bert里面的max_seq_length
@@ -315,7 +315,6 @@ class ModelGen(nn.Module):
         print(sen_batch_size)
         self.vocab = list(self.tokenizer.vocab.keys())
         self.with_rand = with_rand
-        self.split_part = split_part
         if self.n_gpu > 1:
             self.model = torch.nn.DataParallel(self.model)
     

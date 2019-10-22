@@ -148,6 +148,10 @@ def write_labeled_data(labeled_data, output_file):
     with open(output_file, "wb") as f:
         pickle.dump(labeled_data, f)
 
+def split_mask(all_documents, num_parts, rng):
+    pass        
+
+
 def create_training_instances(data, all_labels, task_name, generator, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng, with_rand=False):
     """Create `TrainingInstance`s from raw text."""
 
