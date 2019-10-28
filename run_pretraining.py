@@ -192,7 +192,12 @@ def main():
                         type=int,
                         default=2000,
                         help="Number of update steps until a model checkpoint is saved to disk.")
-
+    parser.add_argument('--dev_data_file',
+                        type=str,
+                        default="dev/dev.hdf5")
+    parser.add_argument('--dev_batch_size',
+                        type=int,
+                        default=16)
 
     args = parser.parse_args()
 
@@ -200,9 +205,14 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+    
+    
+    min_dev_loss = 1000000
+    best_step = 0
+
 
     assert(torch.cuda.is_available())
-
+    print(args.local_rank)
     if args.local_rank == -1:
         device = torch.device("cuda")
         n_gpu = torch.cuda.device_count()
@@ -227,7 +237,8 @@ def main():
 
 
     if not args.resume_from_checkpoint and os.path.exists(args.output_dir) and (os.listdir(args.output_dir) and os.listdir(args.output_dir)!=['logfile.txt']):
-        raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
+        logger.warning("Output directory ({}) already exists and is not empty.".format(args.output_dir))
+        # raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
 
     if not args.resume_from_checkpoint:
         os.makedirs(args.output_dir, exist_ok=True)
@@ -235,7 +246,7 @@ def main():
     # Prepare model
     config = BertConfig.from_json_file(args.config_file)
     if args.load:
-        print("load")
+        print("from pretrain")
         model = BertForMaskedLM.from_pretrained(args.load)
     else:
         model = BertForMaskedLM(config)
@@ -314,7 +325,17 @@ def main():
     files.sort()
 
     num_files = len(files)
-      
+
+    logger.info("***** Loading Dev Data *****")
+    dev_data = pretraining_dataset(input_file=os.path.join(args.input_dir, args.dev_data_file), max_pred_length=args.max_predictions_per_seq)
+    if args.local_rank == -1:
+        dev_sampler = RandomSampler(dev_data)
+        dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=args.dev_batch_size * n_gpu, num_workers=4, pin_memory=True)
+    else:
+        dev_sampler = DistributedSampler(dev_data)
+        dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=args.dev_batch_size, num_workers=4, pin_memory=True)
+        
+
 
     logger.info("***** Running training *****")
     # logger.info("  Num examples = %d", len(train_data))
@@ -355,7 +376,7 @@ def main():
                 train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.train_batch_size, num_workers=4, pin_memory=True)
 
             for step, batch in enumerate(tqdm(train_dataloader, desc="File Iteration")):
-            
+                model.train()
                 training_steps += 1
                 batch = [t.to(device) for t in batch]
                 input_ids, segment_ids, input_mask, masked_lm_labels, next_sentence_labels = batch#\
@@ -393,8 +414,36 @@ def main():
                                                                                 loss.item(), optimizer.param_groups[0]['lr']))
                     average_loss = 0
 
-                if global_step >= args.max_steps or training_steps % (
-                        args.num_steps_per_checkpoint * args.gradient_accumulation_steps) == 0:
+                if training_steps % (args.num_steps_per_checkpoint * args.gradient_accumulation_steps) == 0:
+                    # if global_step >= args.max_steps or training_steps % (args.num_steps_per_checkpoint * args.gradient_accumulation_steps) == 0:
+                    logger.info("Begin Eval")
+                    model.eval()
+                    with torch.no_grad():
+                        dev_global_step = 0
+                        dev_final_loss = 0.0
+                        for dev_step, dev_batch in enumerate(tqdm(dev_dataloader, desc="Evaluating")):
+                            batch = [t.to(device) for t in batch]
+                            dev_input_ids, dev_segment_ids, dev_input_mask, dev_masked_lm_labels, dev_next_sentence_labels = batch
+                            loss = model(input_ids=dev_input_ids, token_type_ids=dev_segment_ids, attention_mask=dev_input_mask, masked_lm_labels=dev_masked_lm_labels)
+                            dev_final_loss += loss
+                            dev_global_step += 1
+                        dev_final_loss /= dev_global_step
+                        if (torch.distributed.is_initialized()):
+                            dev_final_loss /= torch.distributed.get_world_size()
+                            torch.distributed.all_reduce(dev_final_loss)
+                        logger.info("Dev Loss: {}".format(dev_final_loss.item()))
+                        if dev_final_loss < min_dev_loss:
+                            if os.path.exists(os.path.join(args.output_dir, "best_ckpt_{}".format(best_step))):
+                                os.remove(os.path.join(args.output_dir, "best_ckpt_{}".format(best_step)))
+                            best_step = global_step
+                            min_dev_loss = dev_final_loss
+                            if (not torch.distributed.is_initialized() or (torch.distributed.is_initialized() and torch.distributed.get_rank() == 0)):
+                                logger.info("** ** * Saving best dev loss model ** ** * at step {}".format(best_step))
+                                dev_model_to_save = model.module if hasattr(model, 'module') else model
+                                output_save_file = os.path.join(args.output_dir, "best_ckpt_{}.pt".format(best_step))
+                                torch.save({'model' : dev_model_to_save.state_dict(),
+                                            'optimizer' : optimizer.state_dict(),
+                                            'files' : [f_id] + files}, output_save_file)
 
                     if (not torch.distributed.is_initialized() or (torch.distributed.is_initialized() and torch.distributed.get_rank() == 0)):
                         # Save a trained model
@@ -406,9 +455,9 @@ def main():
                                 'optimizer' : optimizer.state_dict(), 
                                 'files' : [f_id] + files}, output_save_file)
 
-                        pretrained_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
+                        # pretrained_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
                         # pretrained_config_file = os.path.join(args.output_dir, "bert_config.json")
-                        torch.save(model_to_save.state_dict(), pretrained_model_file)
+                        # torch.save(model_to_save.state_dict(), pretrained_model_file)
                         # with open(pretrained_config_file, "w") as f:
                             # json.dump(config, f)
 
@@ -422,6 +471,7 @@ def main():
                         tr_loss = tr_loss * args.gradient_accumulation_steps / training_steps
                         if (torch.distributed.is_initialized()):
                             tr_loss /= torch.distributed.get_world_size()
+                            print(tr_loss)
                             torch.distributed.all_reduce(torch.tensor(tr_loss).cuda())
                         logger.info("Total Steps:{} Final Loss = {}".format(training_steps, tr_loss))
                         return

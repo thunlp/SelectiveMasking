@@ -434,8 +434,8 @@ class ModelGen(nn.Module):
                         rand_m_info = self.create_mask(rand_mask_poses, sentences[i], rng)
                         rand_all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=rand_m_info))
                     i += 1
-                print(all_documents[-1])
-                print(rand_all_documents[-1])
+                # print(all_documents[-1])
+                # print(rand_all_documents[-1])
         if self.with_rand:
             print("with rand")
             return all_documents, rand_all_documents

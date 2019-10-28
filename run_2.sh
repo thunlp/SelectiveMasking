@@ -12,7 +12,7 @@ python3 run_classifier_ckpy.py \
     --do_eval \
     --task_name=mr \
     --data_dir=${DATA_DIR}/ \
-    --output_dir=results/mr_dev/${SEED}/ckpt_${ITER}  \
+    --output_dir=results/mr_raw/${SEED}/ckpt_${ITER}  \
     --max_seq_length=256   \
     --train_batch_size=32 \
     --num_train_epochs=10 \
@@ -21,4 +21,4 @@ python3 run_classifier_ckpy.py \
     --fp16 \
     --gradient_accumulation_steps 2 \
     --seed=${SEED} \
-    --ckpt=results/mr_dev/checkpoints/ckpt_${ITER}.pt \
+    # --ckpt=results/mr_dev/checkpoints/ckpt_${ITER}.pt \
