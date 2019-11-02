@@ -4,6 +4,7 @@ import torch.nn as nn
 import numpy as np
 import spacy
 import collections
+import multiprocessing
 from spacy.lang.en import English
 from tqdm import tqdm
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, TensorDataset)
@@ -16,7 +17,9 @@ from tokenization import BertTokenizer
 logger = logging.getLogger(__name__)
 MaskedTokenInstance = collections.namedtuple("MaskedTokenInstance", ["tokens", "info"])
 MaskedItemInfo = collections.namedtuple("MaskedItemInfo", ["current_pos", "sen_doc_pos", "sen_right_id", "doc_ground_truth"])
-
+nlp = English()
+sentencizer = nlp.create_pipe("sentencizer")
+nlp.add_pipe(sentencizer)
 
 class InputFeatures(object):
     def __init__(self, input_ids, input_mask, segment_ids):
@@ -113,6 +116,11 @@ class SC(nn.Module):
         # 根据需要mask的位置生成mask
         masked_info = [{} for token in sen]
         for pos in mask_poses:
+            lexeme = nlp.vocab[sen[pos]]
+            if lexeme.is_stop:
+                print(sen[pos])
+                # 去除停用词
+                continue
             if rng.random() < 0.8:
                 mask_token = "[MASK]"
             else:
@@ -150,14 +158,11 @@ class SC(nn.Module):
         all_label_ids = [label_map[label] for label in all_labels]
         
         # convert data, segment data to sentences
-        tokenized_data = []
-        nlp = English()
-        sentencizer = nlp.create_pipe("sentencizer")
-        nlp.add_pipe(sentencizer)
+        # tokenized_data = []
         sentences = []
         sen_doc_ids = [] # [0, 0, ..., 0, 1, 1, ..., 1, ...] 每个句子对应原来段的id
         for (doc_id, doc) in enumerate(data):
-            tokenized_data.append(self.tokenizer.tokenize(doc))
+            # tokenized_data.append(self.tokenizer.tokenize(doc))
             doc = nlp(doc)
             tL = [self.tokenizer.tokenize(sen.text) for sen in doc.sents]
             sentences.extend(tL)
@@ -279,9 +284,10 @@ class SC(nn.Module):
         #     st = st[0:max(int(self.top_token_rate * len(st)), 1)]
         #     mask_pos_d[sen_doc_pos], _ = zip(*st)
         
-        # print(mask_poses_d)
-        # for key, value in mask_poses_d.items():
-        #     print([sentences[key][pos] for pos in mask_poses_d[key]])
+        print(mask_poses_d)
+        for key, value in mask_poses_d.items():
+            print([sentences[key][pos] for pos in mask_poses_d[key]])
+        
         all_documents = []
 
         # 生成带有mask信息的document
@@ -297,9 +303,18 @@ class SC(nn.Module):
                     m_info = self.create_mask(mask_poses, sentences[i], rng)
                     all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
                     i += 1
-                # print(all_documents[-1])
+                print(all_documents[-1])
         return all_documents
 
+def per_proc(tu):
+    r, m, l = tu
+    K = len(m) - 1
+    t = []
+    for j in range(1, K):
+        mm, rr, ll = m[j], r[j], l[j]
+        if mm == 1:
+            t.append((rr, ll[rr]))
+    return t
 class ModelGen(nn.Module):
     def __init__(self, mask_rate, bert_model, do_lower_case, max_seq_length, sen_batch_size, with_rand=False, use_gpu=True):
         super(ModelGen, self).__init__()
@@ -375,19 +390,37 @@ class ModelGen(nn.Module):
         self.model.eval()
         preds = []
         # for input_ids, input_mask, segment_ids, in eval_dataloader:
+        all_res = []
+        all_logits = []
         for input_ids, input_mask, segment_ids, in tqdm(eval_dataloader, desc="Evaluating"):
             input_ids = input_ids.to(self.device)
             input_mask = input_mask.to(self.device)
             segment_ids = segment_ids.to(self.device)
             with torch.no_grad():
                 logits = self.model(input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
-            
+            # res = np.argmax(logits, axis=2)
             res = torch.argmax(logits, dim=2).detach().cpu().numpy()
             logits = logits.detach().cpu().numpy()
-            for r, m, l in zip(res, input_mask, logits):
-                t = [(rr, ll[rr]) for mm, rr, ll in zip(m[1:-1], r[1:-1], l[1:-1]) if mm == 1]
-                preds.append(t)
-            # logits = [[ll for mm, ll in zip(m[1:-1], l[1:-1]) if mm == 1] for m, l in zip(input_mask, logits)]
+            all_res.extend(res)
+            all_logits.extend(logits)
+        
+
+
+        print("begin cpu")
+        N = len(all_res)
+        # with multiprocessing.Pool(10) as pool:
+        #     preds = pool.map(per_proc, list(zip(all_res, all_input_mask, all_logits)))
+        for i in range(0, N):
+            r, m, l = all_res[i], all_input_mask[i], all_logits[i]
+            K = len(m) - 1
+            t = []
+            for j in range(1, K):
+                mm, rr, ll = m[j], r[j], l[j]
+                if mm == 1:
+                    t.append((rr, ll[rr]))
+            # t = [(rr, ll[rr]) for mm, rr, ll in zip(m[1:-1], r[1:-1], l[1:-1]) if mm == 1]
+            preds.append(t)
+        # logits = [[ll for mm, ll in zip(m[1:-1], l[1:-1]) if mm == 1] for m, l in zip(input_mask, logits)]
             # preds.extend(logits)
 
         return preds
@@ -397,18 +430,16 @@ class ModelGen(nn.Module):
         # data: not tokenized
         doc_num = len(data)
         # convert data, segment data to sentences
-        tokenized_data = []
-        nlp = English()
-        sentencizer = nlp.create_pipe("sentencizer")
-        nlp.add_pipe(sentencizer)
+        # tokenized_data = []
         sentences = []
         sen_doc_ids = []  # [0, 0, ..., 0, 1, 1, ..., 1, ...] 每个句子对应原来段的id
         for (doc_id, doc) in enumerate(data):
-            tokenized_data.append(self.tokenizer.tokenize(doc))
+            # tokenized_data.append(self.tokenizer.tokenize(doc))
             doc = nlp(doc)
             tL = [self.tokenizer.tokenize(sen.text) for sen in doc.sents]
             sentences.extend(tL)
             sen_doc_ids.extend([doc_id] * len(tL))
+            del tL
 
         preds = self.evaluate(sentences, self.sen_batch_size)
 

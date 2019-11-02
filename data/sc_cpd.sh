@@ -8,8 +8,10 @@ echo "Input dir: ${INPUT_DIR}"
 echo "Output dir: ${OUTPUT_DIR}"
 
 PART=$1
+((GPU_ID=$1))
 # echo $INPUT_DIR
-CUDA_VISIBLE_DEVICES=$1 python3 ../sc_cpd.py \
+echo ${GPU_ID}
+CUDA_VISIBLE_DEVICES=${GPU_ID} python3 ../sc_cpd.py \
   --input_dir=${INPUT_DIR} \
   --output_dir=${OUTPUT_DIR} \
   --max_seq_length=${MAX_SEQUENCE_LENGTH} \

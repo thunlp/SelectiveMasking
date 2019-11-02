@@ -247,7 +247,8 @@ class MRProcessor(DataProcessor):
             if part == max_proc - 1:
                 end = data_size
         examples = []
-        for i, line in enumerate(lines[begin:end]):
+        for i in range(begin, end):
+            line = lines[i]
             label = line[0]
             text_a = line[1]
             examples.append(InputExample(guid=i, text_a=text_a, text_b=None, label=label))

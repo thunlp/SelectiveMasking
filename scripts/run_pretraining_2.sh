@@ -16,13 +16,13 @@ seed=${12:-88}
 job_name=${13:-"job"}
 
 
-DATASET=mr_mask_no_stop/amazon_all # change this for other datasets
+DATASET=mr_mask_no_stop/rand_amazon_all # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
 BERT_CONFIG=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
 LOAD_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
-RESULTS_DIR=/home/gyx/nvidia-bert/results/mr_mask_no_stop/model/
-CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/mr_mask_no_stop/model/checkpoints
+RESULTS_DIR=/home/gyx/nvidia-bert/results/mr_mask_no_stop/rand
+CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/mr_mask_no_stop/rand/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 
@@ -86,7 +86,7 @@ CMD+=" $CHECKPOINT"
 
 
 if [ "$num_gpus" -gt 1  ] ; then
-   CMD="python3 -m torch.distributed.launch --nproc_per_node=$num_gpus $CMD"
+   CMD="python3 -m torch.distributed.launch --nproc_per_node=$num_gpus --master_port=23456 $CMD"
 else
    CMD="python3  $CMD"
 fi

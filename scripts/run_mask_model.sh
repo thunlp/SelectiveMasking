@@ -1,8 +1,8 @@
 # DATA_DIR=/home/gyx/nvidia-bert/data/yelp_mask_test/hdf5_shards/merged
 # DATA_DIR=/home/gyx/nvidia-bert/data/yelp_mask_info/hdf5_shards/merged
 # DATA_DIR=/home/gyx/nvidia-bert/data/small-yelp_mask_info/
-DATA_DIR=/home/gyx/nvidia-bert/data/mr_test/hdf5_shards/merged
-OUTPUT_DIR=/home/gyx/nvidia-bert/results/mr_t/mask_generator/
+DATA_DIR=/home/gyx/nvidia-bert/data/mr_mask_no_stop/hdf5_shards/merged
+OUTPUT_DIR=/home/gyx/nvidia-bert/results/mr_mask_no_stop/mask_generator/
 BERT_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/
 
 python3 /home/gyx/nvidia-bert/mask_model_pretrain.py \

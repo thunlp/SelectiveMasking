@@ -158,10 +158,11 @@ def create_training_instances(data, all_labels, task_name, generator, max_seq_le
     # Remove empty documents
     if with_rand:
         all_documents, rand_all_documents = generator(data, all_labels, dupe_factor, rng)
+        print(len(all_documents), len(rand_all_documents))
     else:
         all_documents = generator(data, all_labels, dupe_factor, rng)        
-    
-    print(len(all_documents), len(rand_all_documents))
+        print(len(all_documents))
+
     instances = []
     all_documents = [x for x in all_documents if x]
     rng.shuffle(all_documents)
@@ -364,7 +365,7 @@ def main():
                         type=int,
                         help="Maximum sequence length.")
     parser.add_argument("--sentence_batch_size",
-                        default=128, 
+                        default=256, 
                         type=int)
     parser.add_argument("--top_sen_rate",
                         default=0.8,
@@ -424,6 +425,8 @@ def main():
     data = [example.text_a for example in eval_examples]
     # print(data)
     all_labels = [example.label for example in eval_examples]
+    del eval_examples
+    
     label_list = processor.get_labels()
     logger.info("Bert Model: " + args.bert_model)
     print(torch.cuda.is_available())
@@ -461,7 +464,8 @@ def main():
         labeled_output_file = os.path.join(args.output_dir, "0.pkl")
     
     print(len(instances))
-    print(len(rand_instances))
+    if args.with_rand:
+        print(len(rand_instances))
     write_instance_to_example_file(instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, output_file)
     if args.with_rand:
         write_instance_to_example_file(rand_instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, rand_output_file)
