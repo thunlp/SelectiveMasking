@@ -222,6 +222,80 @@ class Sst2Processor(DataProcessor):
                 InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
         return examples
 
+class TwitterProcessor(DataProcessor):
+    """Processor for the Twitter dataset"""
+    def get_train_examples(self, data_dir):
+        print("get train examples")
+        return self._create_examples(self._read_twitter(os.path.join(data_dir, "train.tsv")), "train")
+    
+    def get_dev_examples(self, data_dir):
+        print("get dev examples")
+        return self._create_examples(self._read_twitter(os.path.join(data_dir, "dev.tsv")), "dev")
+
+    def get_pretrain_examples(self, data_dir, part, max_proc):
+        """See base class"""
+        lines = self._read_twitter(os.path.join(data_dir, "train.tsv"))
+        data_size = len(lines)
+        part_size = data_size // max_proc
+        begin = 0
+        end = data_size
+        if part >= 0:
+            begin = part*part_size
+            end = (part+1)*part_size
+            # print(begin, end)
+            # if end - begin < 1000:
+                # begin = 0
+                # end = data_size
+            if part == max_proc - 1:
+                end = data_size
+        examples = []
+        for i in range(begin, end):
+            line = lines[i]
+            if line[1] == "positive":
+                label = '2'
+            elif line[1] == "negative":
+                label = '1'
+            elif line[1] == "neutral":
+                label = '0'
+            else:
+                assert(0 == 1)
+            text_a = line[2]
+            print(text_a, label)
+            examples.append(InputExample(guid=i, text_a=text_a, text_b=None, label=label))
+        return examples
+
+
+    def _read_twitter(self, input_file):
+        L = []
+        with open(input_file, 'r') as f:
+            for line in f:
+                L.append(line.strip().split("\t"))
+        return L
+
+    def _create_examples(self, lines, set_type):
+        examples = []
+        for (i, line) in enumerate(lines):
+            if i == 0:
+                continue
+            guid = "%s-%s" % (set_type, i)
+            text_a = line[2]
+            if line[1] == "positive":
+                label = '2'
+            elif line[1] == "neutral":
+                label = '1'
+            elif line[1] == "negative":
+                label = '0'
+            else:
+                assert(0 == 1)
+            examples.append(
+                InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+        return examples
+
+    def get_labels(self):
+        return ['0', '1', '2']
+
+    
+
 class MRProcessor(DataProcessor):
     """Processor for the MR dataset"""
     def get_train_examples(self, data_dir):
@@ -656,11 +730,13 @@ def simple_accuracy(preds, labels):
 
 def acc_and_f1(preds, labels):
     acc = simple_accuracy(preds, labels)
-    f1 = f1_score(y_true=labels, y_pred=preds)
+    f1_micro = f1_score(y_true=labels, y_pred=preds, average="micro")
+    f1_macro = f1_score(y_true=labels, y_pred=preds, average="macro")
     return {
         "acc": acc,
-        "f1": f1,
-        "acc_and_f1": (acc + f1) / 2,
+        "f1_micro": f1_micro,
+        "f1_macro": f1_macro,
+        # "acc_and_f1": (acc + f1) / 2,
     }
 
 
@@ -702,6 +778,8 @@ def compute_metrics(task_name, preds, labels):
         return {"acc": simple_accuracy(preds, labels)}
     elif task_name == "mr":
         return {"acc": simple_accuracy(preds, labels)}
+    elif task_name == "twitter":
+        return acc_and_f1(preds, labels)
     else:
         raise KeyError(task_name)
 
@@ -718,7 +796,8 @@ processors = {
     "wnli": WnliProcessor,
     "yelp": YelpProcessor,
     "amazon": AmazonProcessor,
-    "mr": MRProcessor
+    "mr": MRProcessor,
+    "twitter": TwitterProcessor
 }
 
 output_modes = {
@@ -733,5 +812,6 @@ output_modes = {
     "wnli": "classification",
     "yelp": "classification",
     "amazon": "classification",
-    "mr": "classification"
+    "mr": "classification",
+    "twitter": "classification"
 }

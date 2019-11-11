@@ -22,10 +22,9 @@ sentencizer = nlp.create_pipe("sentencizer")
 nlp.add_pipe(sentencizer)
 
 class InputFeatures(object):
-    def __init__(self, input_ids, input_mask, segment_ids):
+    def __init__(self, input_ids, input_mask):
         self.input_ids = input_ids
         self.input_mask = input_mask
-        self.segment_ids = segment_ids
 
 class SC(nn.Module):
     def __init__(self, mask_rate, top_sen_rate, threshold, bert_model, do_lower_case, max_seq_length, label_list, sen_batch_size, use_gpu=True):
@@ -354,26 +353,21 @@ class ModelGen(nn.Module):
 
     def convert_examples_to_features(self, data):
         features = []
-        for tokens in data:
+        for tokens in tqdm(data, desc="converting to features"):
             if len(tokens) >= self.max_seq_length - 1:
                 tokens = tokens[0:(self.max_seq_length - 2)]
             ntokens = []
-            segment_ids = []
             ntokens.append("[CLS]")
-            segment_ids.append(0)
             for token in tokens:
                 ntokens.append(token)
-                segment_ids.append(0)
             ntokens.append("[SEP]")
-            segment_ids.append(0)
             input_ids = self.tokenizer.convert_tokens_to_ids(ntokens)
             input_mask = [1] * len(input_ids)
             while len(input_ids) < self.max_seq_length:
                 input_ids.append(0)
                 input_mask.append(0)
-                segment_ids.append(0)
         
-            features.append(InputFeatures(input_ids=input_ids, input_mask=input_mask, segment_ids=segment_ids))
+            features.append(InputFeatures(input_ids=input_ids, input_mask=input_mask))
 
         return features
 
@@ -381,23 +375,21 @@ class ModelGen(nn.Module):
         eval_features = self.convert_examples_to_features(data)
         all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
-
-        eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids)
+        del eval_features
+        eval_data = TensorDataset(all_input_ids, all_input_mask)
         eval_sampler = SequentialSampler(eval_data)
         eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=batch_size)
 
         self.model.eval()
         preds = []
-        # for input_ids, input_mask, segment_ids, in eval_dataloader:
+        # for input_ids, input_mask in eval_dataloader:
         all_res = []
         all_logits = []
-        for input_ids, input_mask, segment_ids, in tqdm(eval_dataloader, desc="Evaluating"):
+        for input_ids, input_mask in tqdm(eval_dataloader, desc="Evaluating"):
             input_ids = input_ids.to(self.device)
             input_mask = input_mask.to(self.device)
-            segment_ids = segment_ids.to(self.device)
             with torch.no_grad():
-                logits = self.model(input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
+                logits = self.model(input_ids, attention_mask=input_mask)
             # res = np.argmax(logits, axis=2)
             res = torch.argmax(logits, dim=2).detach().cpu().numpy()
             logits = logits.detach().cpu().numpy()
@@ -433,7 +425,7 @@ class ModelGen(nn.Module):
         # tokenized_data = []
         sentences = []
         sen_doc_ids = []  # [0, 0, ..., 0, 1, 1, ..., 1, ...] 每个句子对应原来段的id
-        for (doc_id, doc) in enumerate(data):
+        for (doc_id, doc) in enumerate(tqdm(data)):
             # tokenized_data.append(self.tokenizer.tokenize(doc))
             doc = nlp(doc)
             tL = [self.tokenizer.tokenize(sen.text) for sen in doc.sents]

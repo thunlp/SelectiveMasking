@@ -298,8 +298,9 @@ def main():
         raise ValueError("At least one of `do_train` or `do_eval` must be True.")
 
     if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train:
-        raise ValueError(
-            "Output directory ({}) already exists and is not empty.".format(args.output_dir))
+        # raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
+        logger.warning("Output directory ({}) already exists and is not empty.".format(args.output_dir))
+
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
@@ -362,7 +363,7 @@ def main():
 
         rate = zeros_num / ones_num
         print("statistic: ", zeros_num, ones_num, rate)
-        sample_weight = torch.HalfTensor([1.0, 1.0]).cuda()
+        sample_weight = torch.HalfTensor([1.0, 2]).cuda()
 
         cached_train_features_file = os.path.join(args.data_dir, 'train_{0}_{1}_{2}'.format(
             list(filter(None, args.bert_model.split('/'))).pop(),

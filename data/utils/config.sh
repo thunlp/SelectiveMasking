@@ -45,16 +45,26 @@ TASK_NAME=amazon
 
 # INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_amazon/
 # INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/onem_amazon/
-INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp1/
+# INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp1/
 # INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp2/
-# INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp3/
+INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp3/
 # INPUT_DIR=/home/gyx/nvidia-bert/data/rt-polaritydata/full
 # INPUT_DIR=/home/gyx/nvidia-bert/data/rt-polaritydata/10k
+# INPUT_DIR=/home/gyx/nvidia-bert/data/twitter/small
+# INPUT_DIR=/home/gyx/nvidia-bert/data/twitter/full
 
 # OUTPUT_DIR=/home/gyx/nvidia-bert/data/mr_mask/hdf5_shards
 # OUTPUT_DIR=/home/gyx/nvidia-bert/data/mr_mask_no_stop/hdf5_shards
 # OUTPUT_DIR=/home/gyx/nvidia-bert/data/amazon_mr_model_gen_rand_3/hdf5_shards
-OUTPUT_DIR=/home/gyx/nvidia-bert/data/mr_mask_no_stop/amazon_1/hdf5_shards
+# OUTPUT_DIR=/home/gyx/nvidia-bert/data/mr_mask_no_stop/amazon_1/hdf5_shards
+# OUTPUT_DIR=/home/gyx/nvidia-bert/data/mr_mask_no_stop/yelp_all/hdf5_shards
+
+# OUTPUT_DIR=/home/gyx/nvidia-bert/data/twitter/test/
+# OUTPUT_DIR=/home/gyx/nvidia-bert/data/twitter/twitter_mask/
+# OUTPUT_DIR=/home/gyx/nvidia-bert/data/twitter/amazon_test/
+OUTPUT_DIR=/home/gyx/nvidia-bert/data/twitter/amazon_3/
+
+
 
 
 # model to generate mask trainning sets
@@ -70,8 +80,9 @@ OUTPUT_DIR=/home/gyx/nvidia-bert/data/mr_mask_no_stop/amazon_1/hdf5_shards
 # mask generator
 # BERT_MODEL=/home/gyx/nvidia-bert/results/yelp_all_rand_10dup/mask_generator/temp
 # BERT_MODEL=/home/gyx/nvidia-bert/results/mr_t/mask_generator/temp
-BERT_MODEL=/home/gyx/nvidia-bert/results/mr_mask_no_stop/mask_generator/temp
-
+# BERT_MODEL=/home/gyx/nvidia-bert/results/mr_mask_no_stop/mask_generator/temp
+# BERT_MODEL=/home/gyx/nvidia-bert/results/twitter_test/tmp/
+BERT_MODEL=/home/gyx/nvidia-bert/results/twitter/mask_generator/tmp/
 
 # OUTPUT_DIR=/home/gyx/nvidia-bert/data/yelp_model_mask/hdf5_shards
 # OUTPUT_DIR=/home/gyx/nvidia-bert/data/yelp_mask_info/hdf5_shards

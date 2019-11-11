@@ -16,13 +16,13 @@ seed=${12:-88}
 job_name=${13:-"job"}
 
 
-DATASET=mr_mask_no_stop/rand_amazon_all # change this for other datasets
+# DATA_DIR=data/mr_mask_no_stop/rand_yelp_all/hdf5_shards/
+DATA_DIR=data/twitter/rand_amazon_all/
 
-DATA_DIR=data/${DATASET}/hdf5_shards/
 BERT_CONFIG=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
 LOAD_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
-RESULTS_DIR=/home/gyx/nvidia-bert/results/mr_mask_no_stop/rand
-CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/mr_mask_no_stop/rand/checkpoints
+RESULTS_DIR=/home/gyx/nvidia-bert/results/twitter/rand_amazon
+CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/twitter/rand_amazon/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 
