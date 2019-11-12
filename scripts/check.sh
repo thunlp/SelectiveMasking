@@ -7,4 +7,6 @@ for SEED in ${SEED_ARRAY[@]}
 do
     cat ${HOME}/nvidia-bert/${DIR}/${SEED}/ckpt_${ITER}/all_results.txt
     echo ""
+    cat ${HOME}/nvidia-bert/${DIR}/${SEED}/ckpt_${ITER}/test_eval_results.txt
+    echo ""
 done

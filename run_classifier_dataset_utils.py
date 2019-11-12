@@ -232,6 +232,10 @@ class TwitterProcessor(DataProcessor):
         print("get dev examples")
         return self._create_examples(self._read_twitter(os.path.join(data_dir, "dev.tsv")), "dev")
 
+    def get_test_examples(self, data_dir):
+        print("get test examples")
+        return self._create_examples(self._read_twitter(os.path.join(data_dir, "test.tsv")), "test")
+
     def get_pretrain_examples(self, data_dir, part, max_proc):
         """See base class"""
         lines = self._read_twitter(os.path.join(data_dir, "train.tsv"))
@@ -333,6 +337,9 @@ class MRProcessor(DataProcessor):
         """See base class."""
         return self._create_examples(self._read_tsv(os.path.join(data_dir, "dev.csv"), quotechar='*', delimiter=','), "dev")
 
+    def get_test_examples(self, data_dir):
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "test.csv"), quotechar='*', delimiter=','), "test")
+
     def get_labels(self):
         """See base class."""
         return ['0', '1']
@@ -385,6 +392,9 @@ class YelpProcessor(DataProcessor):
         """See base class."""
         return self._create_examples(self._read_tsv(os.path.join(data_dir, "dev.csv"), quotechar='"', delimiter=','), "dev")
 
+    def get_test_examples(self, data_dir):
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "test.csv"), quotechar='*', delimiter=','), "test")
+
     def get_labels(self):
         """See base class."""
         return ['1', '2', '3', '4', '5']
@@ -436,6 +446,9 @@ class AmazonProcessor(DataProcessor):
     def get_dev_examples(self, data_dir):
         """See base class."""
         return self._create_examples(self._read_tsv(os.path.join(data_dir, "dev.csv"), quotechar='"', delimiter=','), "dev")
+
+    def get_test_examples(self, data_dir):
+        return self._create_examples(self._read_tsv(os.path.join(data_dir, "test.csv"), quotechar='*', delimiter=','), "test")
 
     def get_labels(self):
         """See base class."""
