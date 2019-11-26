@@ -22,9 +22,10 @@ sentencizer = nlp.create_pipe("sentencizer")
 nlp.add_pipe(sentencizer)
 
 class InputFeatures(object):
-    def __init__(self, input_ids, input_mask):
+    def __init__(self, input_ids, input_mask, segment_ids=None):
         self.input_ids = input_ids
         self.input_mask = input_mask
+        self.segment_ids = segment_ids
 
 class SC(nn.Module):
     def __init__(self, mask_rate, top_sen_rate, threshold, bert_model, do_lower_case, max_seq_length, label_list, sen_batch_size, use_gpu=True):
@@ -101,15 +102,6 @@ class SC(nn.Module):
 
         preds_arg = np.argmax(preds[0], axis=1)
         return preds_arg, preds[0]
-
-    # def mask_token(self, sen):
-    #     masked_sentences = []
-    #     masked_poses = []
-    #     for i in range(len(sen)):
-    #         masked_poses.append(i)
-    #         masked_sentences.append(sen[0:i + 1])
-    #         # masked_sentences.append([sen[j] for j in range(len(sen)) if j != i])
-    #     return masked_sentences, masked_poses
 
     def create_mask(self, mask_poses, sen, rng):
         # 根据需要mask的位置生成mask
@@ -260,29 +252,6 @@ class SC(nn.Module):
                 masked_item_infos = temp_masked_item_infos
             mask_pos += 1       
 
-        # print("-" * 100)
-
-        # 原来直接删掉一个词，评分相减的策略
-        # mask_sens_preds, mask_sens_scores = self.evaluate(masked_sens, self.sen_batch_size)
-        # i = 0
-        # mask_pos_d = {}
-        # for sen_id in range(right_sens_num):
-        #     st = []
-        #     origin_score = right_scores[sen_id]
-        #     sen_doc_pos = right_sen_doc_poses[sen_id]
-        #     doc_ground_truth = all_label_ids[sen_doc_ids[sen_doc_pos]]
-        #     print("Ground truth", doc_ground_truth)
-        #     print("origin", origin_score)
-        #     while i < len(mask_sen_doc_poses) and mask_sen_doc_poses[i] == sen_doc_pos:
-        #         c = origin_score - mask_sens_scores[i][doc_ground_truth]
-        #         print(mask_sens_scores[i], sentences[sen_doc_pos][masked_poses[i]])
-        #         # (masked_pos, score)
-        #         st.append((masked_poses[i], c))
-        #         i += 1
-        #     st = sorted(st, key=lambda x: x[-1], reverse=True)
-        #     st = st[0:max(int(self.top_token_rate * len(st)), 1)]
-        #     mask_pos_d[sen_doc_pos], _ = zip(*st)
-        
         print(mask_poses_d)
         for key, value in mask_poses_d.items():
             print([sentences[key][pos] for pos in mask_poses_d[key]])
@@ -305,15 +274,169 @@ class SC(nn.Module):
                 print(all_documents[-1])
         return all_documents
 
-def per_proc(tu):
-    r, m, l = tu
-    K = len(m) - 1
-    t = []
-    for j in range(1, K):
-        mm, rr, ll = m[j], r[j], l[j]
-        if mm == 1:
-            t.append((rr, ll[rr]))
-    return t
+class ASC(nn.Module):
+    def __init__(self, mask_rate, top_sen_rate, threshold, bert_model, do_lower_case, max_seq_length, label_list, sen_batch_size, use_gpu=True):
+        super(ASC, self).__init__()
+        self.mask_rate = mask_rate 
+        self.top_sen_rate = top_sen_rate 
+        self.threshold = threshold
+        self.label_list = label_list
+        self.num_labels = len(self.label_list)
+        self.max_seq_length = max_seq_length
+        self.tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=do_lower_case)
+        self.model = BertForSequenceClassification.from_pretrained(bert_model, num_labels=self.num_labels)
+        self.device = torch.device("cuda" if torch.cuda.is_available() and use_gpu else "cpu")
+        print(self.device)
+        self.model.to(self.device)
+        self.n_gpu = torch.cuda.device_count()
+        self.sen_batch_size = sen_batch_size
+        self.vocab = list(self.tokenizer.vocab.keys())
+        if self.n_gpu > 1:
+            self.model = torch.nn.DataParallel(self.model)
+    
+    def evaluate(self, data, batch_size):
+        eval_features = self.convert_examples_to_features(data)
+        all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
+        all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
+        all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
+
+        eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids)
+        eval_sampler = SequentialSampler(eval_data)
+        eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=batch_size)
+
+        self.model.eval()
+        preds = []
+        for input_ids, input_mask, segment_ids, in tqdm(eval_dataloader, desc="Evaluating"):
+            input_ids = input_ids.to(self.device)
+            input_mask = input_mask.to(self.device)
+            segment_ids = segment_ids.to(self.device)
+            with torch.no_grad():
+                logits = self.model(input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
+                logits = softmax(logits, dim=1)
+            if len(preds) == 0:
+                preds.append(logits.detach().cpu().numpy())
+            else:
+                preds[0] = np.append(preds[0], logits.detach().cpu().numpy(), axis=0)
+
+        preds_arg = np.argmax(preds[0], axis=1)
+        return preds_arg, preds[0]
+
+    def create_mask(self, mask_poses, sen, rng):
+        masked_info = [{} for token in sen]
+        for pos in mask_poses:
+            lexeme = nlp.vocab[sen[pos]]
+            if lexeme.is_stop:
+                # print("stop words: ", sen[pos])
+                continue
+            if rng.random() < 0.8:
+                mask_token = "[MASK]"
+            else:
+                if rng.random() < 0.5:
+                    mask_token = sen[pos]
+                else:
+                    mask_token = self.vocab[rng.randint(
+                        0, len(self.vocab) - 1)]
+            masked_info[pos]["mask"] = mask_token
+            masked_info[pos]["label"] = sen[pos]
+        return masked_info
+
+    def convert_examples_to_features(self, data):
+        features = []
+        for (ex_index, item) in enumerate(data):
+            tokens_b = item["text"]
+            if len(tokens_b) > self.max_seq_length - 2:
+                tokens_b = tokens_b[:(self.max_seq_length - 2)]
+            tokens_a = item["aspect"]
+            tokens = ["[CLS]"] + tokens_a + ["[SEP]"] + tokens_b + ["[SEP]"]
+        
+            segment_ids = [0] * (len(tokens_a) + 2) + [1] * (len(tokens_b) + 1)
+            input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+            input_mask = [1] * len(input_ids)
+        
+            padding = [0] * (self.max_seq_length - len(input_ids))
+            input_ids += padding
+            input_mask += padding
+            segment_ids += padding
+            assert len(input_ids) == self.max_seq_length
+            assert len(input_mask) == self.max_seq_length
+            assert len(segment_ids) == self.max_seq_length
+            features.append(InputFeatures(input_ids=input_ids, input_mask=input_mask, segment_ids=segment_ids))
+
+        return features
+
+    def forward(self, data, all_labels, dupe_factor, rng):
+        # data[i]: {"text": ... , "facts": ["aspect1": label1, "aspect2": label2, ...]}
+        doc_num = len(data)
+        label_map = {label : i for i, label in enumerate(self.label_list)}
+        
+        sen_doc_ids = []
+        sentences = []
+        texts = []
+        for (doc_id, doc) in enumerate(data):
+            text = self.tokenizer.tokenize(doc["text"])
+            texts.append(text)
+            for fact in doc["facts"]:
+                sentences.append({"text": text, "aspect": self.tokenizer.tokenize(fact["category"]), "label": label_map[fact["polarity"]]})
+                sen_doc_ids.append(doc_id)
+
+        logger.info("Begin eval for all sentence")
+        sens_preds, sens_pred_scores = self.evaluate(sentences, self.sen_batch_size)
+
+        right_sens = [] # 分类正确的句子
+        right_scores = [] # 分类正确的句子的分数
+        right_sen_doc_ids = [] # 分类正确的句子属于的那个段的id
+        i = 0
+        for sen_id in range(len(sentences)):
+            if sens_preds[sen_id] == sentences[sen_id]["label"]:
+                right_sens.append(sentences[sen_id])
+                right_sen_doc_ids.append(sen_doc_ids[sen_id])
+                right_scores.append(sens_pred_scores[sen_id][sentences[sen_id]["label"]])
+
+        masked_sens = [] # 所有mask的句子
+        masked_item_infos = [] # 每个句子的一些其他信息
+        
+        # init
+        for sen_right_id, sen in enumerate(right_sens):
+            masked_sens.append({"text": sen["text"][0:1], "aspect": sen["aspect"], "label": sen["label"], "sen_right_id": sen_right_id}) # 一开始每个句子长度是1
+
+        mask_poses_L = [set() for i in range(doc_num)] # 所有mask位置
+        mask_pos = 0 # 正在测试mask的词的位置，每一轮之后加1
+        while len(masked_sens) != 0:
+            _, mask_sens_scores = self.evaluate(masked_sens, self.sen_batch_size)
+            masked_sens_num = len(masked_sens)
+            temp_masked_sens = []
+            temp_masked_item_infos = []
+            for masked_sen, mask_sens_score in zip(masked_sens, mask_sens_scores):
+                doc_ground_truth = masked_sen["label"]
+                sen_right_id = masked_sen["sen_right_id"]
+                origin_score = right_scores[sen_right_id] # 原句的分
+                right_sen_doc_id = right_sen_doc_ids[sen_right_id]
+                # print(right_sens[sen_right_id]["text"], masked_sen["text"], " origin: ", origin_score, "mask: ", mask_sens_score[doc_ground_truth])
+                if origin_score - mask_sens_score[doc_ground_truth] < self.threshold:
+                    mask_poses_L[right_sen_doc_id].add(mask_pos)
+                    masked_sen["text"].pop()
+                
+                if mask_pos + 1 < len(right_sens[sen_right_id]["text"]):
+                    masked_sen["text"].append(right_sens[sen_right_id]["text"][mask_pos + 1])
+                    temp_masked_sens.append(masked_sen)
+                
+                masked_sens = temp_masked_sens
+            mask_pos += 1       
+
+        
+        all_documents = []
+        for doc_id in range(doc_num):
+            mask_poses = mask_poses_L[doc_id]
+            print([texts[doc_id][pos] for pos in mask_poses])
+
+        for _ in range(dupe_factor):
+            for doc_id in tqdm(range(doc_num), desc="Generating All Documents"):
+                mask_poses = mask_poses_L[doc_id]
+                m_info = self.create_mask(mask_poses, texts[doc_id], rng)
+                all_documents.append([MaskedTokenInstance(tokens=texts[doc_id], info=m_info)])
+
+        return all_documents
+
 class ModelGen(nn.Module):
     def __init__(self, mask_rate, bert_model, do_lower_case, max_seq_length, sen_batch_size, with_rand=False, use_gpu=True):
         super(ModelGen, self).__init__()
@@ -398,11 +521,10 @@ class ModelGen(nn.Module):
         
 
 
-        print("begin cpu")
         N = len(all_res)
         # with multiprocessing.Pool(10) as pool:
         #     preds = pool.map(per_proc, list(zip(all_res, all_input_mask, all_logits)))
-        for i in range(0, N):
+        for i in tqdm(range(0, N), desc="Begin CPU"):
             r, m, l = all_res[i], all_input_mask[i], all_logits[i]
             K = len(m) - 1
             t = []

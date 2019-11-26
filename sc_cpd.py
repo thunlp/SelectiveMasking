@@ -34,7 +34,7 @@ import random
 import collections
 import mask_utils.mask_generators as mask_generators
 from run_classifier_dataset_utils import processors
-from sc_mask_gen import SC, ModelGen
+from sc_mask_gen import SC, ModelGen, ASC
 from rand_mask_gen import RandMask
 
 
@@ -365,7 +365,7 @@ def main():
                         type=int,
                         help="Maximum sequence length.")
     parser.add_argument("--sentence_batch_size",
-                        default=256, 
+                        default=32, 
                         type=int)
     parser.add_argument("--top_sen_rate",
                         default=0.8,
@@ -421,10 +421,13 @@ def main():
     print("creating instance from {}".format(args.input_dir))
     processor = processors[args.task_name]()
     eval_examples = processor.get_pretrain_examples(args.input_dir, args.part, args.max_proc)
-    # print(len(eval_examples))
-    data = [example.text_a for example in eval_examples]
-    # print(data)
-    all_labels = [example.label for example in eval_examples]
+    if args.task_name == "absa":
+        data = eval_examples
+        all_labels = None
+    else:
+        data = [example.text_a for example in eval_examples]
+        all_labels = [example.label for example in eval_examples]
+    
     del eval_examples
     
     label_list = processor.get_labels()
@@ -434,8 +437,11 @@ def main():
         print("Mode: rand")
         generator = RandMask(args.masked_lm_prob, args.bert_model, args.do_lower_case, args.max_seq_length)
     elif args.mode == "rule":
-        print("Mode: rule", )    
-        generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
+        print("Mode: rule")
+        if args.task_name == "absa":
+            generator = ASC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
+        else:
+            generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
     else:
         print("Mode: model")
         generator = ModelGen(args.masked_lm_prob, args.bert_model, args.do_lower_case, args.max_seq_length, args.sentence_batch_size, with_rand=args.with_rand)

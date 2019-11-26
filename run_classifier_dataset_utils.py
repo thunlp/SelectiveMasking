@@ -21,6 +21,7 @@ import csv
 import logging
 import os
 import sys
+import xml.etree.ElementTree as ET
 
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import matthews_corrcoef, f1_score
@@ -221,6 +222,63 @@ class Sst2Processor(DataProcessor):
             examples.append(
                 InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
         return examples
+
+class ABSAProcessor(DataProcessor):
+    def _create_absa_examples(self, L, set_type):
+        examples = []
+        for (i, line) in enumerate(L):
+            guid = "%s-%s" % (set_type, i)
+            text_b = line["text"]
+            for label in line["labels"]:
+                examples.append(InputExample(guid=guid, text_a=label["category"], text_b=text_b, label=label["polarity"]))
+        return examples
+    
+    def get_train_examples(self, data_dir):
+        return self._create_absa_examples(self._read_xml(os.path.join(data_dir, "train.xml")), "train")
+    
+    def get_dev_examples(self, data_dir):
+        return self._create_absa_examples(self._read_xml(os.path.join(data_dir, "dev.xml")), "dev")
+
+    def get_test_examples(self, data_dir):
+        return self._create_absa_examples(self._read_xml(os.path.join(data_dir, "test.xml")), "test")
+
+    def get_pretrain_examples(self, data_dir, part, max_proc):
+        """See base class"""
+        lines = self._read_xml(os.path.join(data_dir, "train.xml"))
+        data_size = len(lines)
+        part_size = data_size // max_proc
+        begin = 0
+        end = data_size
+        if part >= 0:
+            begin = part*part_size
+            end = (part+1)*part_size
+            # print(begin, end)
+            # if end - begin < 1000:
+            # begin = 0
+            # end = data_size
+            if part == max_proc - 1:
+                end = data_size
+        examples = []
+        for i in range(begin, end):
+            line = lines[i]
+            examples.append({"text": line["text"], "facts": line["labels"]})
+        return examples
+
+    def _read_xml(self, path):
+        elements = ET.parse(path).getroot().findall("sentence")
+        L = []
+        for e in elements:
+            text = e.find("text").text
+            labels = []
+            for et in e.findall("aspectCategories"):
+                for es in et:
+                    labels.append({"category": es.attrib["category"], "polarity": es.attrib["polarity"]})    
+            L.append({"text": text, "labels": labels})
+
+        return L
+
+    def get_labels(self):
+        return ["positive", "negative", "neutral"]
 
 class TwitterProcessor(DataProcessor):
     """Processor for the Twitter dataset"""
@@ -793,6 +851,8 @@ def compute_metrics(task_name, preds, labels):
         return {"acc": simple_accuracy(preds, labels)}
     elif task_name == "twitter":
         return acc_and_f1(preds, labels)
+    elif task_name == "absa":
+        return acc_and_f1(preds, labels)
     else:
         raise KeyError(task_name)
 
@@ -810,7 +870,8 @@ processors = {
     "yelp": YelpProcessor,
     "amazon": AmazonProcessor,
     "mr": MRProcessor,
-    "twitter": TwitterProcessor
+    "twitter": TwitterProcessor,
+    "absa": ABSAProcessor
 }
 
 output_modes = {
@@ -826,5 +887,6 @@ output_modes = {
     "yelp": "classification",
     "amazon": "classification",
     "mr": "classification",
-    "twitter": "classification"
+    "twitter": "classification",
+    "absa": "classification"
 }
