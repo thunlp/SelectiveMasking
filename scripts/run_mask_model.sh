@@ -2,12 +2,15 @@
 # DATA_DIR=/home/gyx/nvidia-bert/data/yelp_mask_info/hdf5_shards/merged
 # DATA_DIR=/home/gyx/nvidia-bert/data/small-yelp_mask_info/
 # DATA_DIR=/home/gyx/nvidia-bert/data/mr_mask_no_stop/hdf5_shards/merged
-DATA_DIR=/home/gyx/nvidia-bert/data/twitter/twitter_mask/merged
+# DATA_DIR=/home/gyx/nvidia-bert/data/twitter/twitter_mask/merged
+DATA_DIR=/home/gyx/nvidia-bert/data/absa/30w_absa_mask/merged
 
 # OUTPUT_DIR=/home/gyx/nvidia-bert/results/mr_mask_no_stop/mask_generator/
-OUTPUT_DIR=/home/gyx/nvidia-bert/results/twitter/mask_generator/
+# OUTPUT_DIR=/home/gyx/nvidia-bert/results/twitter/mask_generator/
+OUTPUT_DIR=/home/gyx/nvidia-bert/results/absa/30w_mask_generator/
 
 BERT_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/
+CKPT=/home/gyx/nvidia-bert/results/small_bert/ckpt_300000.pt
 
 python3 /home/gyx/nvidia-bert/mask_model_pretrain.py \
     --bert_model=${BERT_MODEL} \
@@ -18,8 +21,9 @@ python3 /home/gyx/nvidia-bert/mask_model_pretrain.py \
     --output_dir=${OUTPUT_DIR}  \
     --max_seq_length=128   \
     --train_batch_size=32 \
-    --num_train_epochs=3 \
-    --learning_rate=1e-4 \
+    --num_train_epochs=10 \
+    --learning_rate=1e-5 \
     --do_lower_case \
     --fp16 \
-    --gradient_accumulation_steps 2 
+    --gradient_accumulation_steps 2 \
+    --ckpt=${CKPT}

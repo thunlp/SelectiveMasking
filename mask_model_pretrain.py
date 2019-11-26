@@ -202,6 +202,9 @@ def main():
                         help="The output directory where the model predictions and checkpoints will be written.")
 
     ## Other parameters
+    parser.add_argument("--ckpt", 
+                        default="",
+                        type=str)
     parser.add_argument("--vocab_file",
                         default="",
                         type=str,)
@@ -326,6 +329,16 @@ def main():
     # Prepare model
     model = BertForTokenClassification.from_pretrained(args.bert_model, num_labels=num_labels)
     
+    if args.ckpt:
+        print("load from", args.ckpt)
+        model_dict = model.state_dict()
+        ckpt = torch.load(args.ckpt)
+        pretrained_dict = ckpt['model']
+        new_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict.keys()}
+        model_dict.update(new_dict)
+        print('Total : {}, update: {}'.format(len(pretrained_dict), len(new_dict)))
+        model.load_state_dict(model_dict)
+
     if args.local_rank == 0:
         torch.distributed.barrier()
     
@@ -363,7 +376,7 @@ def main():
 
         rate = zeros_num / ones_num
         print("statistic: ", zeros_num, ones_num, rate)
-        sample_weight = torch.HalfTensor([1.0, 2]).cuda()
+        sample_weight = torch.HalfTensor([1.0, 3]).cuda()
 
         cached_train_features_file = os.path.join(args.data_dir, 'train_{0}_{1}_{2}'.format(
             list(filter(None, args.bert_model.split('/'))).pop(),
@@ -561,7 +574,7 @@ def main():
                             zero_tokens += int(pp == '0')
                             right_zero_tokens += int(tt == '0')
             
-            print("Result: {}/{}".format(right_tokens, all_tokens))
+            print("Result: {}/{} Rate:{}".format(right_tokens, all_tokens, right_tokens / all_tokens))
             print("Zero tokens: {}/{}".format(zero_tokens, all_tokens))
             print("Right zero tokens: {}/{}".format(right_zero_tokens, all_tokens))
             # report = classification_report(y_true, y_pred, digits=4)
