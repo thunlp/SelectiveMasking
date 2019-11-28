@@ -2,11 +2,11 @@
 
 source utils/config.sh
 
-# INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/
-INPUT_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/tenk_yelp/
-OUTPUT_DIR=/home/gyx/nvidia-bert/data/yelp_10k/hdf5_shards
-#BERT_MODEL=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/uncase
-BERT_MODEL=/home/gyx/nvidia-bert/outputs/yelp_first/uncase_8000
+# INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/
+INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/tenk_yelp/
+OUTPUT_DIR=${HOME}/nvidia-bert/data/yelp_10k/hdf5_shards
+#BERT_MODEL=${HOME}/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/uncase
+BERT_MODEL=${HOME}/nvidia-bert/outputs/yelp_first/uncase_8000
 # BERT_MODEL=../outputs/yelp_second/uncase_25000/
 # BERT_MODEL=../outputs/yelp_full
 TOP_SEN_RATE=1

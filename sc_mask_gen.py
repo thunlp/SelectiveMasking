@@ -526,17 +526,17 @@ class ModelGen(nn.Module):
         #     preds = pool.map(per_proc, list(zip(all_res, all_input_mask, all_logits)))
         for i in tqdm(range(0, N), desc="Begin CPU"):
             r, m, l = all_res[i], all_input_mask[i], all_logits[i]
-            K = len(m) - 1
+            K = len(m)
             t = []
             for j in range(1, K):
                 mm, rr, ll = m[j], r[j], l[j]
                 if mm == 1:
                     t.append((rr, ll[rr]))
+            t.pop() # pop out [SEP]
             # t = [(rr, ll[rr]) for mm, rr, ll in zip(m[1:-1], r[1:-1], l[1:-1]) if mm == 1]
             preds.append(t)
         # logits = [[ll for mm, ll in zip(m[1:-1], l[1:-1]) if mm == 1] for m, l in zip(input_mask, logits)]
             # preds.extend(logits)
-
         return preds
 
 

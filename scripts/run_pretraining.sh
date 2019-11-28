@@ -17,12 +17,12 @@ job_name=${13:-"job"}
 
 
 # DATA_DIR=data/mr_mask_no_stop/yelp_all/hdf5_shards/
-DATA_DIR=data/twitter/amazon_all/
-
-BERT_CONFIG=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
-LOAD_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
-RESULTS_DIR=/home/gyx/nvidia-bert/results/twitter/model_amazon/
-CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/twitter/model_amazon/checkpoints
+DATA_DIR=data/absa/30w_model_yelp
+CKPT=results/small_bert/ckpt_300000.pt
+BERT_CONFIG=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
+BERT_MODEL=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
+RESULTS_DIR=${HOME}/nvidia-bert/results/absa/30w_model_yelp/
+CHECKPOINTS_DIR=${HOME}/nvidia-bert/results/absa/30w_model_yelp/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 
@@ -66,12 +66,12 @@ fi
 
 echo $DATA_DIR
 INPUT_DIR=$DATA_DIR
-CMD=" /home/gyx/nvidia-bert/run_pretraining.py"
+CMD=" ${HOME}/nvidia-bert/run_pretraining.py"
 CMD+=" --input_dir=$DATA_DIR"
 CMD+=" --output_dir=$CHECKPOINTS_DIR"
 CMD+=" --config_file=$BERT_CONFIG"
-CMD+=" --load=$LOAD_MODEL"
-CMD+=" --bert_model=bert-base-uncased"
+CMD+=" --ckpt=${CKPT}"
+CMD+=" --bert_model=${BERT_MODEL}"
 CMD+=" --train_batch_size=$train_batch_size"
 CMD+=" --max_seq_length=256"
 CMD+=" --max_predictions_per_seq=80"

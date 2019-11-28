@@ -120,7 +120,7 @@ def main():
                         help="The output directory where the model checkpoints will be written.")
 
     ## Other parameters
-    parser.add_argument("--load", 
+    parser.add_argument("--ckpt", 
                         default="",
                         type=str)
     parser.add_argument("--max_seq_length",
@@ -245,11 +245,16 @@ def main():
 
     # Prepare model
     config = BertConfig.from_json_file(args.config_file)
-    if args.load:
-        print("from pretrain")
-        model = BertForMaskedLM.from_pretrained(args.load)
+    if args.bert_model:
+        model = BertForMaskedLM.from_pretrained(args.bert_model)
     else:
         model = BertForMaskedLM(config)
+
+    print(args.ckpt)
+    if args.ckpt:
+        print("load from", args.ckpt)
+        ckpt = torch.load(args.ckpt, map_location='cpu')
+        model.load_state_dict(ckpt['model'], strict=False)
 
     # model_to_save = model.module if hasattr(
         # model, 'module') else model  # Only save the model it-self

@@ -26,6 +26,7 @@ from io import open
 from file_utils import cached_path
 
 logger = logging.getLogger(__name__)
+home = os.environ.get('HOME')
 
 PRETRAINED_VOCAB_ARCHIVE_MAP = {
     # 'bert-base-uncased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-vocab.txt",
@@ -36,13 +37,13 @@ PRETRAINED_VOCAB_ARCHIVE_MAP = {
     # 'bert-base-multilingual-cased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-multilingual-cased-vocab.txt",
     # 'bert-base-chinese': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-chinese-vocab.txt",
 
-    'bert-base-uncased': "/home/gyx/nvidia-bert/vocab/uncased_L-12_H-768_A-12/vocab.txt",
-    'bert-large-uncased': "/home/gyx/nvidia-bert/vocab/uncased_L-24_H-1024_A-16/vocab.txt",
-    'bert-base-cased': "/home/gyx/nvidia-bert/vocab/cased_L-12_H-768_A-12/vocab.txt",
-    'bert-large-cased': "/home/gyx/nvidia-bert/vocab/cased_L-24_H-1024_A-16/vocab.txt",
-    'bert-base-multilingual-uncased': "/home/gyx/nvidia-bert/vocab/multilingual_L-12_H-768_A-12/vocab.txt",
-    'bert-base-multilingual-cased': "/home/gyx/nvidia-bert/vocab/multi_cased_L-12_H-768_A-12/vocab.txt",
-    'bert-base-chinese': "/home/gyx/nvidia-bert/vocab/chinese_L-12_H-768_A-12/vocab.txt",
+    'bert-base-uncased': home + "/nvidia-bert/vocab/uncased_L-12_H-768_A-12/vocab.txt",
+    'bert-large-uncased': home + "/nvidia-bert/vocab/uncased_L-24_H-1024_A-16/vocab.txt",
+    'bert-base-cased': home + "/nvidia-bert/vocab/cased_L-12_H-768_A-12/vocab.txt",
+    'bert-large-cased': home + "/nvidia-bert/vocab/cased_L-24_H-1024_A-16/vocab.txt",
+    'bert-base-multilingual-uncased': home + "/nvidia-bert/vocab/multilingual_L-12_H-768_A-12/vocab.txt",
+    'bert-base-multilingual-cased': home + "/nvidia-bert/vocab/multi_cased_L-12_H-768_A-12/vocab.txt",
+    'bert-base-chinese': home + "/nvidia-bert/vocab/chinese_L-12_H-768_A-12/vocab.txt",
 }
 PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP = {
     'bert-base-uncased': 512,

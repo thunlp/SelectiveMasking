@@ -1,18 +1,18 @@
-# DATA_DIR=/home/gyx/nvidia-bert/data/yelp_mask_test/hdf5_shards/merged
-# DATA_DIR=/home/gyx/nvidia-bert/data/yelp_mask_info/hdf5_shards/merged
-# DATA_DIR=/home/gyx/nvidia-bert/data/small-yelp_mask_info/
-# DATA_DIR=/home/gyx/nvidia-bert/data/mr_mask_no_stop/hdf5_shards/merged
-# DATA_DIR=/home/gyx/nvidia-bert/data/twitter/twitter_mask/merged
-DATA_DIR=/home/gyx/nvidia-bert/data/absa/30w_absa_mask/merged
+# DATA_DIR=${HOME}/nvidia-bert/data/yelp_mask_test/hdf5_shards/merged
+# DATA_DIR=${HOME}/nvidia-bert/data/yelp_mask_info/hdf5_shards/merged
+# DATA_DIR=${HOME}/nvidia-bert/data/small-yelp_mask_info/
+# DATA_DIR=${HOME}/nvidia-bert/data/mr_mask_no_stop/hdf5_shards/merged
+# DATA_DIR=${HOME}/nvidia-bert/data/twitter/twitter_mask/merged
+DATA_DIR=${HOME}/nvidia-bert/data/absa/30w_absa_mask/merged
 
-# OUTPUT_DIR=/home/gyx/nvidia-bert/results/mr_mask_no_stop/mask_generator/
-# OUTPUT_DIR=/home/gyx/nvidia-bert/results/twitter/mask_generator/
-OUTPUT_DIR=/home/gyx/nvidia-bert/results/absa/30w_mask_generator/
+# OUTPUT_DIR=${HOME}/nvidia-bert/results/mr_mask_no_stop/mask_generator/
+# OUTPUT_DIR=${HOME}/nvidia-bert/results/twitter/mask_generator/
+OUTPUT_DIR=${HOME}/nvidia-bert/results/absa/30w_mask_generator/
 
-BERT_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/
-CKPT=/home/gyx/nvidia-bert/results/small_bert/ckpt_300000.pt
+BERT_MODEL=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/
+CKPT=${HOME}/nvidia-bert/results/small_bert/ckpt_300000.pt
 
-python3 /home/gyx/nvidia-bert/mask_model_pretrain.py \
+python3 ${HOME}/nvidia-bert/mask_model_pretrain.py \
     --bert_model=${BERT_MODEL} \
     --do_train \
     --do_eval \

@@ -17,7 +17,7 @@ job_name=${13:-"job"}
 
 
 DATASET=wiki_1g_cased_2 # change this for other datasets
-HOMEGYX=/home/gyx
+HOMEGYX=${HOME}
 
 DATA_DIR=${HOMEGYX}/nvidia-bert/data/${DATASET}/hdf5_shards/
 BERT_CONFIG=${HOMEGYX}/nvidia-bert/pretrain_bert_model/bert-base-cased/bert_config.json
@@ -67,7 +67,7 @@ fi
 
 echo $DATA_DIR
 INPUT_DIR=$DATA_DIR
-CMD=" /home/gyx/nvidia-bert/run_pretraining.py"
+CMD=" ${HOME}/nvidia-bert/run_pretraining.py"
 CMD+=" --input_dir=$DATA_DIR"
 CMD+=" --output_dir=$CHECKPOINTS_DIR"
 CMD+=" --config_file=$BERT_CONFIG"

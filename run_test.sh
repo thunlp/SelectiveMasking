@@ -1,7 +1,7 @@
-# DATA_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv
+# DATA_DIR=${HOME}/nvidia-bert/data/yelp_amazon/yelp_review_full_csv
     # --bert_model bert-base-uncased \
-# DATA_DIR=/home/gyx/nvidia-bert/data/rt-polaritydata/full/
-DATA_DIR=/home/gyx/nvidia-bert/data/twitter/full/
+# DATA_DIR=${HOME}/nvidia-bert/data/rt-polaritydata/full/
+DATA_DIR=${HOME}/nvidia-bert/data/twitter/full/
 
 
 SEED=$1

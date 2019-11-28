@@ -57,7 +57,7 @@ else
 fi
 
 echo $DATA_DIR
-CMD=" /home/gyx/nvidia-bert/run_pretraining_inference.py"
+CMD=" ${HOME}/nvidia-bert/run_pretraining_inference.py"
 CMD+=" --input_dir=$DATA_DIR"
 CMD+=" --ckpt_dir=$CHECKPOINTS_DIR"
 CMD+=" --config_file=$BERT_CONFIG"

@@ -19,10 +19,10 @@ job_name=${13:-"job"}
 DATASET=yelp_full_reverse # change this for other datasets
 
 DATA_DIR=data/${DATASET}/hdf5_shards/
-BERT_CONFIG=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
-LOAD_MODEL=/home/gyx/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
-RESULTS_DIR=/home/gyx/nvidia-bert/results/yelp_reverse
-CHECKPOINTS_DIR=/home/gyx/nvidia-bert/results/yelp_reverse/checkpoints
+BERT_CONFIG=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
+LOAD_MODEL=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
+RESULTS_DIR=${HOME}/nvidia-bert/results/yelp_reverse
+CHECKPOINTS_DIR=${HOME}/nvidia-bert/results/yelp_reverse/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 
@@ -66,7 +66,7 @@ fi
 
 echo $DATA_DIR
 INPUT_DIR=$DATA_DIR
-CMD=" /home/gyx/nvidia-bert/run_pretraining.py"
+CMD=" ${HOME}/nvidia-bert/run_pretraining.py"
 CMD+=" --input_dir=$DATA_DIR"
 CMD+=" --output_dir=$CHECKPOINTS_DIR"
 CMD+=" --config_file=$BERT_CONFIG"

@@ -1,4 +1,4 @@
-YELP_DIR=/home/gyx/nvidia-bert/data/yelp_amazon/yelp_review_full_csv
+YELP_DIR=${HOME}/nvidia-bert/data/yelp_amazon/yelp_review_full_csv
     # --bert_model bert-base-uncased \
 
 ITER=$1

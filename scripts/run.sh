@@ -79,7 +79,7 @@ fi
 unique_hosts=( $(echo "${hosts[@]}" | tr ' ' '\n' | sort -u | tr '\n' ' ' ) )
 export MASTER_HOST=${hosts[0]}
 
-VARS="-e OMPI_MCA_mca_base_param_files=/dev/shm/mpi/${SLURM_JOB_ID}/mca_params.conf -e EXTRA_PARAMS -e GPUS -e BATCHSIZE -e CONT -e DGXSYSTEM=$DGXSYSTEM -e MASTER_HOST -e MASTER_IP -e SLURM_JOB_NUM_NODES -e SLURM_NNODES -e SLURM_NTASKS_PER_NODE -w /home/gyx/nvidia-bert"
+VARS="-e OMPI_MCA_mca_base_param_files=/dev/shm/mpi/${SLURM_JOB_ID}/mca_params.conf -e EXTRA_PARAMS -e GPUS -e BATCHSIZE -e CONT -e DGXSYSTEM=$DGXSYSTEM -e MASTER_HOST -e MASTER_IP -e SLURM_JOB_NUM_NODES -e SLURM_NNODES -e SLURM_NTASKS_PER_NODE -w ${HOME}/nvidia-bert"
 
 RUNSLEEPCMD=""
 

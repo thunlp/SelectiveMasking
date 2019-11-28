@@ -5,18 +5,18 @@
 
 echo "Container nvidia build = " $NVIDIA_BUILD_ID
 
-init_checkpoint=${1:-"/home/gyx/checkpoints/bert_uncased.pt"}
+init_checkpoint=${1:-"${HOME}/checkpoints/bert_uncased.pt"}
 epochs=${2:-"2.0"}
 batch_size=${3:-"3"}
 learning_rate=${4:-"3e-5"}
 precision=${5:-"fp16"}
 num_gpu=${6:-"8"}
 seed=${7:-"1"}
-squad_dir=${8:-"/home/gyx/nvidia-bert/data/squad/v1.1"}
-vocab_file=${9:-"/home/gyx/nvidia-bert/vocab/vocab"}
+squad_dir=${8:-"${HOME}/nvidia-bert/data/squad/v1.1"}
+vocab_file=${9:-"${HOME}/nvidia-bert/vocab/vocab"}
 OUT_DIR=${10:-"/results/SQuAD"}
 mode=${11:-"train eval"}
-CONFIG_FILE=${12:-"/home/gyx/nvidia-bert/bert_config.json"}
+CONFIG_FILE=${12:-"${HOME}/nvidia-bert/bert_config.json"}
 max_steps=${13:-"-1"}
 
 echo "out dir is $OUT_DIR"

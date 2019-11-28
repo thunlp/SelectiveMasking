@@ -3,8 +3,8 @@
         "mask_samp": 10,
         "mask_num": 2,
         "mask_rate": 0.0,
-        "model_path": "/home/gyx/nvidia-bert/downstream_models/ner/test_100_cased/bert_1g_100dim_cased.model",
-        "mapping_file": "/home/gyx/nvidia-bert/downstream_models/ner/test_100_cased/mapping.pkl",
+        "model_path": "${HOME}/nvidia-bert/downstream_models/ner/test_100_cased/bert_1g_100dim_cased.model",
+        "mapping_file": "${HOME}/nvidia-bert/downstream_models/ner/test_100_cased/mapping.pkl",
         "gpu": 1
     }
 }
