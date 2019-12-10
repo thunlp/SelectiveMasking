@@ -17,12 +17,12 @@ job_name=${13:-"job"}
 
 
 # DATA_DIR=data/mr_mask_no_stop/yelp_all/hdf5_shards/
-DATA_DIR=data/absa/30w_model_yelp
-CKPT=results/small_bert/ckpt_300000.pt
+DATA_DIR=data/mr_mask_no_stop/20w_rand_amazon
+CKPT=results/small_bert/ckpt_200000.pt
 BERT_CONFIG=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
 BERT_MODEL=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz
-RESULTS_DIR=${HOME}/nvidia-bert/results/absa/30w_model_yelp/
-CHECKPOINTS_DIR=${HOME}/nvidia-bert/results/absa/30w_model_yelp/checkpoints
+RESULTS_DIR=${HOME}/nvidia-bert/results/mr_mask_no_stop/20w_rand_amazon
+CHECKPOINTS_DIR=${HOME}/nvidia-bert/results/mr_mask_no_stop/20w_rand_amazon/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 

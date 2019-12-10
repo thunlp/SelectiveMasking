@@ -1,6 +1,6 @@
 #! /bin/bash
 
-source utils/config.sh
+source utils/config_rule.sh
 
 # OUTPUT_FILE="${OUTPUT_DIR}/${SHARD_INDEX}.hdf5"
 echo "Bert model: ${BERT_MODEL}"

@@ -271,6 +271,8 @@ def main():
                         help="Loss scaling to improve fp16 numeric stability. Only used when fp16 set to True.\n"
                              "0 (default value): dynamic loss scaling.\n"
                              "Positive power of 2: static loss scaling value.\n")
+    parser.add_argument('--rate',
+                        type=float, default=1)
     args = parser.parse_args()
 
     processors = {"maskgen": MaskGenProcessor}
@@ -376,7 +378,7 @@ def main():
 
         rate = zeros_num / ones_num
         print("statistic: ", zeros_num, ones_num, rate)
-        sample_weight = torch.HalfTensor([1.0, 3]).cuda()
+        sample_weight = torch.HalfTensor([1.0, args.rate]).cuda()
 
         cached_train_features_file = os.path.join(args.data_dir, 'train_{0}_{1}_{2}'.format(
             list(filter(None, args.bert_model.split('/'))).pop(),

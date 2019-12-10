@@ -3,14 +3,16 @@
 # DATA_DIR=${HOME}/nvidia-bert/data/small-yelp_mask_info/
 # DATA_DIR=${HOME}/nvidia-bert/data/mr_mask_no_stop/hdf5_shards/merged
 # DATA_DIR=${HOME}/nvidia-bert/data/twitter/twitter_mask/merged
-DATA_DIR=${HOME}/nvidia-bert/data/absa/30w_absa_mask/merged
+# DATA_DIR=${HOME}/nvidia-bert/data/absa/30w_absa_mask/merged
+DATA_DIR=${HOME}/nvidia-bert/data/absa/20w_absa_mask/merged
+
 
 # OUTPUT_DIR=${HOME}/nvidia-bert/results/mr_mask_no_stop/mask_generator/
 # OUTPUT_DIR=${HOME}/nvidia-bert/results/twitter/mask_generator/
-OUTPUT_DIR=${HOME}/nvidia-bert/results/absa/30w_mask_generator/
+OUTPUT_DIR=${HOME}/nvidia-bert/results/absa/20w_mask_generator/
 
 BERT_MODEL=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/
-CKPT=${HOME}/nvidia-bert/results/small_bert/ckpt_300000.pt
+CKPT=${HOME}/nvidia-bert/results/small_bert/ckpt_200000.pt
 
 python3 ${HOME}/nvidia-bert/mask_model_pretrain.py \
     --bert_model=${BERT_MODEL} \
@@ -26,4 +28,5 @@ python3 ${HOME}/nvidia-bert/mask_model_pretrain.py \
     --do_lower_case \
     --fp16 \
     --gradient_accumulation_steps 2 \
+    --rate=1.5 \
     --ckpt=${CKPT}

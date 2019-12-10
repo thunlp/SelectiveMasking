@@ -37,6 +37,7 @@ class SC(nn.Module):
         self.num_labels = len(self.label_list)
         self.max_seq_length = max_seq_length # bert里面的max_seq_length
         self.tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case=do_lower_case)
+        print(self.num_labels)
         self.model = BertForSequenceClassification.from_pretrained(bert_model, num_labels=self.num_labels)
         self.device = torch.device("cuda" if torch.cuda.is_available() and use_gpu else "cpu")
         print(self.device)
@@ -109,7 +110,7 @@ class SC(nn.Module):
         for pos in mask_poses:
             lexeme = nlp.vocab[sen[pos]]
             if lexeme.is_stop:
-                print(sen[pos])
+                # print(sen[pos])
                 # 去除停用词
                 continue
             if rng.random() < 0.8:
@@ -159,15 +160,8 @@ class SC(nn.Module):
             sentences.extend(tL)
             sen_doc_ids.extend([doc_id] * len(tL))
 
-        # print(data)
-        # print(all_label_ids)
-        # print(sentences)
-        # print(sen_doc_ids)
         logger.info("Begin eval for all sentence")
         sens_preds, sens_pred_scores = self.evaluate(sentences, self.sen_batch_size)
-        # print(sens_preds)
-        # np.set_printoptions(suppress=True)
-        # print(sens_pred_scores)
 
         # 所有分类正确的句子的信息
         right_sens = [] # 分类正确的句子
@@ -196,16 +190,6 @@ class SC(nn.Module):
             right_sen_doc_ids.extend(t_sen_doc_id)
             right_sen_doc_poses.extend(t_sen_doc_pos)
         
-        # print(right_sens)
-        # print(right_preds)
-        # print(right_scores)
-        # print(np.mean(right_scores))
-        # print(np.sum(right_scores))
-        # print(np.max(right_scores))
-        # print(np.min(right_scores))
-        # print(right_sen_doc_ids)
-        # print(right_sen_doc_poses)
-
         right_sens_num = len(right_sens)
         # convert right sentence to reverse
 
@@ -222,14 +206,11 @@ class SC(nn.Module):
         mask_pos = 0 # 正在测试mask的词的位置，每一轮之后加1
         # 每一轮循环过后，masked_sens里面的句子长度会加一（上一个词没有被选中，并加入了下一个词），或者不变（上一个词被选中了，并加入了下一个词），句子个数逐渐变少
         while len(masked_sens) != 0:
-            # print(mask_pos)
-            # print(masked_sens)
             _, mask_sens_scores = self.evaluate(masked_sens, self.sen_batch_size)
             masked_sens_num = len(masked_sens)
             temp_masked_sens = []
             temp_masked_item_infos = []
             for masked_sen, masked_item_info, mask_sens_score in zip(masked_sens, masked_item_infos, mask_sens_scores):
-                # print(mask_sens_score)
                 sen_doc_pos = masked_item_info["sen_doc_pos"]
                 doc_ground_truth = masked_item_info["doc_ground_truth"]
                 sen_right_id = masked_item_info["sen_right_id"]
@@ -252,9 +233,9 @@ class SC(nn.Module):
                 masked_item_infos = temp_masked_item_infos
             mask_pos += 1       
 
-        print(mask_poses_d)
-        for key, value in mask_poses_d.items():
-            print([sentences[key][pos] for pos in mask_poses_d[key]])
+        # print(mask_poses_d)
+        # for key, value in mask_poses_d.items():
+            # print([sentences[key][pos] for pos in mask_poses_d[key]])
         
         all_documents = []
 
@@ -271,7 +252,7 @@ class SC(nn.Module):
                     m_info = self.create_mask(mask_poses, sentences[i], rng)
                     all_documents[-1].append(MaskedTokenInstance(tokens=sentences[i], info=m_info))
                     i += 1
-                print(all_documents[-1])
+                # print(all_documents[-1])
         return all_documents
 
 class ASC(nn.Module):
