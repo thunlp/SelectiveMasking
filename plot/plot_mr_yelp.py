@@ -9,7 +9,7 @@ font1 = {'family': 'Times New Roman',
 
 font2 = {'family': 'Times New Roman',
          'weight': 'normal',
-         'size': 30,
+         'size': 35,
          }
 
 fig = plt.figure(figsize=(10, 10))
@@ -59,7 +59,7 @@ l1, = sub.plot(main_steps, main_score, 'ro-', ms=ms)
 for step, score in zip(main_steps, main_score):
     sub.text(step + shiftX *4 / 5, score - shiftY / 4, str(step) + "k", ha='center', va='center', fontsize=fontsize1)
 sub.hlines(87.37, 100, 500, colors="gray", linestyles="dashed", linewidth=3)
-sub.text(200, 87, "Fully-trained (1M steps)", ha='center', va='center', fontsize=25)
+sub.text(210, 87, "Fully-trained (1M steps)", ha='center', va='center', fontsize=27)
 sub.text(48, 87.37, "87.4-", ha='center', va='center', fontsize=fontsize2)
 
 plt.grid()
