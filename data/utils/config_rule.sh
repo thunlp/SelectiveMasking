@@ -38,20 +38,23 @@ else
 fi
 
 MODE=rule
-TASK_NAME=absa
+TASK_NAME=absa_term
 
 # INPUT_DIR=${HOME}/nvidia-bert/data/rt-polaritydata/full
 # INPUT_DIR=${HOME}/nvidia-bert/data/rt-polaritydata/10k
-INPUT_DIR=${HOME}/nvidia-bert/data/Aspect-Based-Sentiment-Analysis/14data/
+INPUT_DIR=${HOME}/nvidia-bert/data/Aspect-Based-Sentiment-Analysis/14data_lap/
 
 # OUTPUT_DIR=${HOME}/nvidia-bert/data/absa/20w_absa_mask/
-OUTPUT_DIR=${HOME}/nvidia-bert/data/absa/20w_absa_mask/
+# OUTPUT_DIR=${HOME}/nvidia-bert/data/absa/20w_absa_mask/
+OUTPUT_DIR=${HOME}/nvidia-bert/data/absa_lap/full_absa_mask/
+
 
 
 # model to generate mask trainning sets
 # BERT_MODEL=${HOME}/nvidia-bert/results/mr/temp/
 # BERT_MODEL=${HOME}/nvidia-bert/results/yelp_all_rand_10dup/mask_gen/
-BERT_MODEL=${HOME}/nvidia-bert/results/absa/small_bert/tmp_20w/
+# BERT_MODEL=${HOME}/nvidia-bert/results/absa/small_bert/tmp_20w/
+BERT_MODEL=${HOME}/nvidia-bert/results/absa_lap/origin/42/ckpt_0/
 
 TOP_SEN_RATE=1
 THRESHOLD=0.01

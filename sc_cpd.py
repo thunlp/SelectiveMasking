@@ -421,7 +421,7 @@ def main():
     print("creating instance from {}".format(args.input_dir))
     processor = processors[args.task_name]()
     eval_examples = processor.get_pretrain_examples(args.input_dir, args.part, args.max_proc)
-    if args.task_name == "absa":
+    if args.task_name == "absa" or args.task_name == "absa_term":
         data = eval_examples
         all_labels = None
     else:
@@ -438,7 +438,7 @@ def main():
         generator = RandMask(args.masked_lm_prob, args.bert_model, args.do_lower_case, args.max_seq_length)
     elif args.mode == "rule":
         print("Mode: rule")
-        if args.task_name == "absa":
+        if args.task_name == "absa" or args.task_name == "absa_term":
             generator = ASC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)
         else:
             generator = SC(args.masked_lm_prob, args.top_sen_rate, args.threshold, args.bert_model, args.do_lower_case, args.max_seq_length, label_list, args.sentence_batch_size)

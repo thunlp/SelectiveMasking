@@ -357,8 +357,10 @@ class ASC(nn.Module):
             text = self.tokenizer.tokenize(doc["text"])
             texts.append(text)
             for fact in doc["facts"]:
-                sentences.append({"text": text, "aspect": self.tokenizer.tokenize(fact["category"]), "label": label_map[fact["polarity"]]})
-                sen_doc_ids.append(doc_id)
+                prefix = fact["category"] if "category" in fact else fact["term"]
+                if fact["polarity"] != "conflict":
+                    sentences.append({"text": text, "aspect": self.tokenizer.tokenize(prefix), "label": label_map[fact["polarity"]]})
+                    sen_doc_ids.append(doc_id)
 
         logger.info("Begin eval for all sentence")
         sens_preds, sens_pred_scores = self.evaluate(sentences, self.sen_batch_size)
