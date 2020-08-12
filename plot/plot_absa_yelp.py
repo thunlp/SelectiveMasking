@@ -69,5 +69,5 @@ plt.tick_params(labelsize=fontsize2)
 plt.xlabel("k Steps", font2)
 plt.ylabel("Acc.(%)", font2)
 
-plt.legend(handles=[l1, l2, l3], labels=['General Pre-train', 'Task-guided Mask', 'Random Mask'], loc='lower right', prop=font1)
-plt.savefig("images/absa_yelp.pdf", format="pdf")
+plt.legend(handles=[l1, l2, l3], labels=['General Pre-train', 'Selective Mask', 'Random Mask'], loc='lower right', prop=font1)
+plt.savefig("../images/absa_yelp.pdf", format="pdf")

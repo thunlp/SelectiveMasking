@@ -28,7 +28,7 @@ import numpy as np
 
 import torch
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
-                              TensorDataset)
+                              TensorDataset, Dataset)
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn import CrossEntropyLoss, MSELoss
 
@@ -49,6 +49,46 @@ else:
 
 logger = logging.getLogger(__name__)
 
+class InputDataset(Dataset):
+    def __init__(self, input_ids, attn_masks, segment_ids, labels):
+        self.input_ids = input_ids
+        self.attn_masks = attn_masks
+        self.segment_ids = segment_ids
+        self.labels = labels
+
+        self.pads = {
+            "input_ids": 0,
+            "attention_mask": 0,
+            "token_type_ids": 0
+        }
+
+    def __len__(self):
+        return len(self.input_ids)
+
+    def __getitem__(self, item):
+        return {
+            "input_ids": self.input_ids[item],
+            "attention_mask": self.attn_masks[item],
+            "token_type_ids": self.segment_ids[item],
+        }, {
+            "labels": self.labels[item]
+        }
+
+    def collate(self, example):
+        seq_insts = [e[0] for e in example]
+        int_insts = [e[1] for e in example]
+        max_length = max([len(x["input_ids"]) for x in seq_insts])
+        
+        inputs = {}
+        labels = {}
+
+        for key in seq_insts[0].keys():
+            seq = [inst[key] + [self.pads[key]] * (max_length - len(inst[key])) for inst in seq_insts]
+            inputs[key] = torch.tensor(seq, dtype=torch.long)
+        for key in int_insts[0].keys():
+            labels[key] = torch.tensor([inst[key] for inst in int_insts])
+
+        return inputs, labels
 
 def main():
     parser = argparse.ArgumentParser()
@@ -139,6 +179,13 @@ def main():
     parser.add_argument('--fp16',
                         action='store_true',
                         help="Whether to use 16-bit float precision instead of 32-bit")
+    parser.add_argument(
+        "--fp16_opt_level",
+        type=str,
+        default="O1",
+        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
+        "See details at https://nvidia.github.io/apex/amp.html",
+    )
     parser.add_argument('--loss_scale',
                         type=float, default=0,
                         help="Loss scaling to improve fp16 numeric stability. Only used when fp16 set to True.\n"
@@ -228,8 +275,8 @@ def main():
     if args.local_rank == 0:
         torch.distributed.barrier()
 
-    if args.fp16:
-        model.half()
+    # if args.fp16:
+    #     model.half()
     model.to(device)
     if args.local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(model,
@@ -265,21 +312,27 @@ def main():
                 with open(cached_train_features_file, "wb") as writer:
                     pickle.dump(train_features, writer)
 
-        all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
-        all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
-        all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
+        # all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
+        # all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
+        # all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
+
+        all_input_ids = [f.input_ids for f in train_features]
+        all_input_mask = [f.input_mask for f in train_features]
+        all_segment_ids = [f.segment_ids for f in train_features]
 
         if output_mode == "classification":
-            all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.long)
+            all_label_ids = [f.label_id for f in train_features]
         elif output_mode == "regression":
-            all_label_ids = torch.tensor([f.label_id for f in train_features], dtype=torch.float)
+            all_label_ids = [f.label_id for f in train_features]
 
-        train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+        # train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+        train_data = InputDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
+
         if args.local_rank == -1:
             train_sampler = RandomSampler(train_data)
         else:
             train_sampler = DistributedSampler(train_data)
-        train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.train_batch_size)
+        train_dataloader = DataLoader(train_data, sampler=train_sampler, batch_size=args.train_batch_size, collate_fn=train_data.collate)
 
         num_train_optimization_steps = len(train_dataloader) // args.gradient_accumulation_steps * args.num_train_epochs
 
@@ -291,28 +344,39 @@ def main():
             {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
             ]
+        optimizer = BertAdam(optimizer_grouped_parameters,
+                     lr=args.learning_rate,
+                     warmup=args.warmup_proportion,
+                     t_total=num_train_optimization_steps)
         if args.fp16:
             try:
-                from apex.optimizers import FP16_Optimizer
-                from apex.optimizers import FusedAdam
+                from apex import amp
             except ImportError:
-                raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
+                raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
+            model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level)
 
-            optimizer = FusedAdam(optimizer_grouped_parameters,
-                                  lr=args.learning_rate,
-                                  bias_correction=False,
-                                  max_grad_norm=1.0)
-            if args.loss_scale == 0:
-                optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
-            else:
-                optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
-            # warmup_linear = WarmupLinearSchedule(warmup=args.warmup_proportion, t_total=num_train_optimization_steps)
+        # if args.fp16:
+        #     try:
+        #         from apex.optimizers import FP16_Optimizer
+        #         from apex.optimizers import FusedAdam
+        #     except ImportError:
+        #         raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
 
-        else:
-            optimizer = BertAdam(optimizer_grouped_parameters,
-                                 lr=args.learning_rate,
-                                 warmup=args.warmup_proportion,
-                                 t_total=num_train_optimization_steps)
+        #     optimizer = FusedAdam(optimizer_grouped_parameters,
+        #                           lr=args.learning_rate,
+        #                           bias_correction=False,
+        #                           max_grad_norm=1.0)
+        #     if args.loss_scale == 0:
+        #         optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
+        #     else:
+        #         optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
+        #     # warmup_linear = WarmupLinearSchedule(warmup=args.warmup_proportion, t_total=num_train_optimization_steps)
+
+        # else:
+        #     optimizer = BertAdam(optimizer_grouped_parameters,
+        #                          lr=args.learning_rate,
+        #                          warmup=args.warmup_proportion,
+        #                          t_total=num_train_optimization_steps)
 
         logger.info("***** Running training *****")
         logger.info("  Num examples = %d", len(train_examples))
@@ -324,11 +388,14 @@ def main():
             tr_loss = 0
             nb_tr_examples, nb_tr_steps = 0, 0
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])):
-                batch = tuple(t.to(device) for t in batch)
-                input_ids, input_mask, segment_ids, label_ids = batch
-
+                inputs, labels = batch
+                for key in inputs.keys():
+                    inputs[key] = inputs[key].to(args.device)
+                for key in labels.keys():
+                    labels[key] = labels[key].to(args.device)
                 # define a new function to compute loss values for both output_modes
-                logits = model(input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
+                label_ids = labels["labels"]
+                logits = model(**inputs)
 
                 if output_mode == "classification":
                     loss_fct = CrossEntropyLoss()
@@ -342,22 +409,28 @@ def main():
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
 
+                # if args.fp16:
+                #     optimizer.backward(loss)
+                # else:
+                #     loss.backward()
+
                 if args.fp16:
-                    optimizer.backward(loss)
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
                 else:
                     loss.backward()
 
                 tr_loss += loss.item()
-                nb_tr_examples += input_ids.size(0)
+                # nb_tr_examples += input_ids.size(0)
                 nb_tr_steps += 1
                 if (step + 1) % args.gradient_accumulation_steps == 0:
-                    if args.fp16:
-                        # modify learning rate with special warm up BERT uses
-                        # if args.fp16 is False, BertAdam is used that handles this automatically
-                        lr_this_step = args.learning_rate * warmup_linear(global_step / num_train_optimization_steps, args.warmup_proportion)
-                        # lr_this_step = args.learning_rate * warmup_linear.get_lr(global_step, args.warmup_proportion)
-                        for param_group in optimizer.param_groups:
-                            param_group['lr'] = lr_this_step
+                    # if args.fp16:
+                    #     # modify learning rate with special warm up BERT uses
+                    #     # if args.fp16 is False, BertAdam is used that handles this automatically
+                    #     lr_this_step = args.learning_rate * warmup_linear(global_step / num_train_optimization_steps, args.warmup_proportion)
+                    #     # lr_this_step = args.learning_rate * warmup_linear.get_lr(global_step, args.warmup_proportion)
+                    #     for param_group in optimizer.param_groups:
+                    #         param_group['lr'] = lr_this_step
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
@@ -460,21 +533,16 @@ def evaluate(args, model, weight_path, processor, device, task_name, mode, label
     logger.info("***** Running evaluation *****")
     logger.info("  Num examples = %d", len(eval_examples))
     logger.info("  Batch size = %d", args.eval_batch_size)
-    all_input_ids = torch.tensor(
-        [f.input_ids for f in eval_features], dtype=torch.long)
-    all_input_mask = torch.tensor(
-        [f.input_mask for f in eval_features], dtype=torch.long)
-    all_segment_ids = torch.tensor(
-        [f.segment_ids for f in eval_features], dtype=torch.long)
+    all_input_ids = [f.input_ids for f in eval_features]
+    all_input_mask = [f.input_mask for f in eval_features]
+    all_segment_ids = [f.segment_ids for f in eval_features]
 
     if output_mode == "classification":
-        all_label_ids = torch.tensor(
-            [f.label_id for f in eval_features], dtype=torch.long)
+        all_label_ids = [f.label_id for f in eval_features]
     elif output_mode == "regression":
-        all_label_ids = torch.tensor(
-            [f.label_id for f in eval_features], dtype=torch.float)
+        all_label_ids = [f.label_id for f in eval_features]
 
-    eval_data = TensorDataset(
+    eval_data = InputDataset(
         all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
     # Run prediction for full data
     if args.local_rank == -1:
@@ -483,7 +551,7 @@ def evaluate(args, model, weight_path, processor, device, task_name, mode, label
         # Note that this sampler samples randomly
         eval_sampler = DistributedSampler(eval_data)
     eval_dataloader = DataLoader(
-        eval_data, sampler=eval_sampler, batch_size=args.eval_batch_size)
+        eval_data, sampler=eval_sampler, batch_size=args.eval_batch_size, collate_fn=eval_data.collate)
 
     model.eval()
     eval_loss = 0
@@ -491,15 +559,17 @@ def evaluate(args, model, weight_path, processor, device, task_name, mode, label
     preds = []
     out_label_ids = None
 
-    for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
-        input_ids = input_ids.to(device)
-        input_mask = input_mask.to(device)
-        segment_ids = segment_ids.to(device)
-        label_ids = label_ids.to(device)
+    for batch in tqdm(eval_dataloader, desc="Evaluating"):
+        inputs, labels = batch
+        for key in inputs.keys():
+            inputs[key] = inputs[key].to(args.device)
+        for key in labels.keys():
+            labels[key] = labels[key].to(args.device)
+        # define a new function to compute loss values for both output_modes
+        label_ids = labels["labels"]
 
         with torch.no_grad():
-            logits = model(
-                input_ids, token_type_ids=segment_ids, attention_mask=input_mask)
+            logits = model(**inputs)
 
         # create eval loss and other metric required by the task
         if output_mode == "classification":
@@ -524,7 +594,7 @@ def evaluate(args, model, weight_path, processor, device, task_name, mode, label
 
     eval_loss = eval_loss / nb_eval_steps
     preds = preds[0]
-    print(preds[0])
+    # print(preds[0])
     if output_mode == "classification":
         preds = np.argmax(preds, axis=1)
     elif output_mode == "regression":

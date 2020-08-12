@@ -230,7 +230,8 @@ class ABSAProcessor(DataProcessor):
             guid = "%s-%s" % (set_type, i)
             text_b = line["text"]
             for label in line["labels"]:
-                examples.append(InputExample(guid=guid, text_a=label["category"], text_b=text_b, label=label["polarity"]))
+                if label["polarity"] != "conflict":
+                    examples.append(InputExample(guid=guid, text_a=label["category"], text_b=text_b, label=label["polarity"]))
         return examples
     
     def get_train_examples(self, data_dir):
@@ -273,6 +274,64 @@ class ABSAProcessor(DataProcessor):
             for et in e.findall("aspectCategories"):
                 for es in et:
                     labels.append({"category": es.attrib["category"], "polarity": es.attrib["polarity"]})    
+            L.append({"text": text, "labels": labels})
+
+        return L
+
+    def get_labels(self):
+        return ["positive", "negative", "neutral"]
+
+class ABSATermProcessor(DataProcessor):
+    def _create_absa_examples(self, L, set_type):
+        examples = []
+        for (i, line) in enumerate(L):
+            guid = "%s-%s" % (set_type, i)
+            text_b = line["text"]
+            for label in line["labels"]:
+                if label["polarity"] != "conflict":
+                    examples.append(InputExample(guid=guid, text_a=label["term"], text_b=text_b, label=label["polarity"]))
+        return examples
+    
+    def get_train_examples(self, data_dir):
+        return self._create_absa_examples(self._read_xml(os.path.join(data_dir, "train.xml")), "train")
+    
+    def get_dev_examples(self, data_dir):
+        return self._create_absa_examples(self._read_xml(os.path.join(data_dir, "dev.xml")), "dev")
+
+    def get_test_examples(self, data_dir):
+        return self._create_absa_examples(self._read_xml(os.path.join(data_dir, "test.xml")), "test")
+
+    def get_pretrain_examples(self, data_dir, part, max_proc):
+        """See base class"""
+        lines = self._read_xml(os.path.join(data_dir, "train.xml"))
+        data_size = len(lines)
+        part_size = data_size // max_proc
+        begin = 0
+        end = data_size
+        if part >= 0:
+            begin = part*part_size
+            end = (part+1)*part_size
+            # print(begin, end)
+            # if end - begin < 1000:
+            # begin = 0
+            # end = data_size
+            if part == max_proc - 1:
+                end = data_size
+        examples = []
+        for i in range(begin, end):
+            line = lines[i]
+            examples.append({"text": line["text"], "facts": line["labels"]})
+        return examples
+
+    def _read_xml(self, path):
+        elements = ET.parse(path).getroot().findall("sentence")
+        L = []
+        for e in elements:
+            text = e.find("text").text
+            labels = []
+            for et in e.findall("aspectTerms"):
+                for es in et:
+                    labels.append({"term": es.attrib["term"], "polarity": es.attrib["polarity"]})    
             L.append({"text": text, "labels": labels})
 
         return L
@@ -743,14 +802,14 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
         input_mask = [1] * len(input_ids)
 
         # Zero-pad up to the sequence length.
-        padding = [0] * (max_seq_length - len(input_ids))
-        input_ids += padding
-        input_mask += padding
-        segment_ids += padding
+        # padding = [0] * (max_seq_length - len(input_ids))
+        # input_ids += padding
+        # input_mask += padding
+        # segment_ids += padding
 
-        assert len(input_ids) == max_seq_length
-        assert len(input_mask) == max_seq_length
-        assert len(segment_ids) == max_seq_length
+        # assert len(input_ids) == max_seq_length
+        # assert len(input_mask) == max_seq_length
+        # assert len(segment_ids) == max_seq_length
 
         if output_mode == "classification":
             label_id = label_map[example.label]
@@ -853,6 +912,8 @@ def compute_metrics(task_name, preds, labels):
         return acc_and_f1(preds, labels)
     elif task_name == "absa":
         return acc_and_f1(preds, labels)
+    elif task_name == "absa_term":
+        return acc_and_f1(preds, labels)
     else:
         raise KeyError(task_name)
 
@@ -871,7 +932,8 @@ processors = {
     "amazon": AmazonProcessor,
     "mr": MRProcessor,
     "twitter": TwitterProcessor,
-    "absa": ABSAProcessor
+    "absa": ABSAProcessor,
+    "absa_term": ABSATermProcessor
 }
 
 output_modes = {
@@ -888,5 +950,6 @@ output_modes = {
     "amazon": "classification",
     "mr": "classification",
     "twitter": "classification",
-    "absa": "classification"
+    "absa": "classification",
+    "absa_term": "classification"
 }

@@ -40,4 +40,4 @@ python3 run_classifier_ckpy.py \
     --gradient_accumulation_steps 2 \
     --seed=${SEED} \
     --ckpt=${CKPT} \
-    # --fp16 \
+    --fp16 \
