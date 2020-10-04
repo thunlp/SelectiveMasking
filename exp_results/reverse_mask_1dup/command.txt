@@ -1,3 +1,0 @@
-CUDA_VISIBLE_DEVICES=0,1,2,3 . xarg_sc_cpd.sh
-CUDA_VISIBLE_DEVICES=0,1,2,3 bash scripts/run_pretraining.sh 28 2e-5 fp16 4 0.2 30000 2000 false true true
-. run.sh 28000

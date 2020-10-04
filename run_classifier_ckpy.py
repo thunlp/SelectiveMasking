@@ -1,20 +1,3 @@
-# coding=utf-8
-# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
-# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""BERT finetuning runner."""
-
 from __future__ import absolute_import, division, print_function
 
 import argparse
@@ -32,9 +15,6 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn import CrossEntropyLoss, MSELoss
 
-# from tensorboardX import SummaryWriter
-
-# from file_utils import WEIGHTS_NAME, CONFIG_NAME
 from modeling_classification import BertForSequenceClassification, WEIGHTS_NAME, CONFIG_NAME
 from tokenization import BertTokenizer
 from optimization import BertAdam, warmup_linear
@@ -192,16 +172,8 @@ def main():
                              "0 (default value): dynamic loss scaling.\n"
                              "Positive power of 2: static loss scaling value.\n")
     parser.add_argument("--ckpt", type=str, help="ckpt position")
-    parser.add_argument('--server_ip', type=str, default='', help="Can be used for distant debugging.")
-    parser.add_argument('--server_port', type=str, default='', help="Can be used for distant debugging.")
+    parser.add_argument("--save_all", action="store_true")
     args = parser.parse_args()
-
-    if args.server_ip and args.server_port:
-        # Distant debugging - see https://code.visualstudio.com/docs/python/debugging#_attach-to-a-local-script
-        import ptvsd
-        print("Waiting for debugger attach")
-        ptvsd.enable_attach(address=(args.server_ip, args.server_port), redirect_output=True)
-        ptvsd.wait_for_attach()
 
     if args.local_rank == -1 or args.no_cuda:
         device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
@@ -236,8 +208,6 @@ def main():
     if not args.do_train and not args.do_eval:
         raise ValueError("At least one of `do_train` or `do_eval` must be True.")
 
-    # if os.path.exists(args.output_dir) and os.listdir(args.output_dir) and args.do_train and not args.overwrite_output_dir:
-        # raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
     if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(args.output_dir)
 
@@ -278,8 +248,6 @@ def main():
     if args.local_rank == 0:
         torch.distributed.barrier()
 
-    # if args.fp16:
-    #     model.half()
     model.to(device)
     if args.local_rank != -1:
         model = torch.nn.parallel.DistributedDataParallel(model,
@@ -294,9 +262,6 @@ def main():
     tr_loss = 0
 
     if args.do_train:
-        # if args.local_rank in [-1, 0]:
-        #     tb_writer = SummaryWriter()
-
         # Prepare data loader
         train_examples = processor.get_train_examples(args.data_dir)
         print(len(train_examples))
@@ -315,10 +280,6 @@ def main():
                 with open(cached_train_features_file, "wb") as writer:
                     pickle.dump(train_features, writer)
 
-        # all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
-        # all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
-        # all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
-
         all_input_ids = [f.input_ids for f in train_features]
         all_input_mask = [f.input_mask for f in train_features]
         all_segment_ids = [f.segment_ids for f in train_features]
@@ -328,7 +289,6 @@ def main():
         elif output_mode == "regression":
             all_label_ids = [f.label_id for f in train_features]
 
-        # train_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
         train_data = InputDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
 
         if args.local_rank == -1:
@@ -358,34 +318,12 @@ def main():
                 raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use fp16 training.")
             model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level)
 
-        # if args.fp16:
-        #     try:
-        #         from apex.optimizers import FP16_Optimizer
-        #         from apex.optimizers import FusedAdam
-        #     except ImportError:
-        #         raise ImportError("Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
-
-        #     optimizer = FusedAdam(optimizer_grouped_parameters,
-        #                           lr=args.learning_rate,
-        #                           bias_correction=False,
-        #                           max_grad_norm=1.0)
-        #     if args.loss_scale == 0:
-        #         optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
-        #     else:
-        #         optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
-        #     # warmup_linear = WarmupLinearSchedule(warmup=args.warmup_proportion, t_total=num_train_optimization_steps)
-
-        # else:
-        #     optimizer = BertAdam(optimizer_grouped_parameters,
-        #                          lr=args.learning_rate,
-        #                          warmup=args.warmup_proportion,
-        #                          t_total=num_train_optimization_steps)
-
         logger.info("***** Running training *****")
         logger.info("  Num examples = %d", len(train_examples))
         logger.info("  Batch size = %d", args.train_batch_size)
         logger.info("  Num steps = %d", num_train_optimization_steps)
 
+        os.makedirs(os.path.join(args.output_dir, "all_models"), exist_ok=True)
         model.train()
         for e in trange(int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0]):
             tr_loss = 0
@@ -412,11 +350,6 @@ def main():
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
 
-                # if args.fp16:
-                #     optimizer.backward(loss)
-                # else:
-                #     loss.backward()
-
                 if args.fp16:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
@@ -424,28 +357,17 @@ def main():
                     loss.backward()
 
                 tr_loss += loss.item()
-                # nb_tr_examples += input_ids.size(0)
                 nb_tr_steps += 1
                 if (step + 1) % args.gradient_accumulation_steps == 0:
-                    # if args.fp16:
-                    #     # modify learning rate with special warm up BERT uses
-                    #     # if args.fp16 is False, BertAdam is used that handles this automatically
-                    #     lr_this_step = args.learning_rate * warmup_linear(global_step / num_train_optimization_steps, args.warmup_proportion)
-                    #     # lr_this_step = args.learning_rate * warmup_linear.get_lr(global_step, args.warmup_proportion)
-                    #     for param_group in optimizer.param_groups:
-                    #         param_group['lr'] = lr_this_step
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
-                    # if args.local_rank in [-1, 0]:
-                    #     tb_writer.add_scalar('lr', optimizer.get_lr()[0], global_step)
-                    #     tb_writer.add_scalar('loss', loss.item(), global_step)
             # save each epoch
             model_to_save = model.module if hasattr(model, 'module') else model
-            output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME+str(e))
+            output_model_file = os.path.join(args.output_dir, "all_models", "e{}_{}".format(e, WEIGHTS_NAME))
             torch.save(model_to_save.state_dict(), output_model_file)
+
     ### Saving best-practices: if you use defaults names for the model, you can reload it using from_pretrained()
-    ### Example:
     if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
         # Save a trained model, configuration and tokenizer
         model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
@@ -458,13 +380,6 @@ def main():
         with open(output_config_file, 'w') as f:
             f.write(model_to_save.config.to_json_string())
 
-        # model_to_save.config.to_json_string(output_config_file)
-        # tokenizer.save_vocabulary(args.output_dir)
-
-        # Load a trained model and vocabulary that you have fine-tuned
-        # model = BertForSequenceClassification.from_pretrained(args.output_dir, num_labels=num_labels)
-        # tokenizer = BertTokenizer.from_pretrained(args.output_dir, do_lower_case=args.do_lower_case)
-
         # Good practice: save your training arguments together with the trained model
         output_args_file = os.path.join(args.output_dir, 'training_args.bin')
         torch.save(args, output_args_file)
@@ -475,33 +390,42 @@ def main():
     if args.do_eval and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
         best_acc = 0
         best_epoch = 0
+        val_res_file = os.path.join(args.output_dir, "valid_results.txt")
+        val_f = open(val_res_file, "w")
+        logger.info("***** Dev Eval results *****")
         for e in range(int(args.num_train_epochs)):
-            weight_path = os.path.join(args.output_dir, WEIGHTS_NAME+str(e))
+            weight_path = os.path.join(args.output_dir, "all_models", "e{}_{}".format(e, WEIGHTS_NAME))
             result = evaluate(args, model, weight_path, processor, device, task_name, "dev", label_list, tokenizer, output_mode, num_labels)
             if result["acc"] > best_acc:
                 best_acc = result["acc"]
                 best_epoch = e
 
-            output_eval_file = os.path.join(args.output_dir, "eval_results_{}.txt".format(e))
+            logger.info("Epoch {}".format(e))
+            val_f.write("Epoch {}\n".format(e))
+            for key in sorted(result.keys()):
+                logger.info("{} = {}".format(key, str(result[key])))
+                val_f.write("{} = {}\n".format(key, str(result[key])))
+            val_f.write("\n")
 
-            with open(output_eval_file, "w") as writer:
-                logger.info("***** Dev Eval results *****")
-                for key in sorted(result.keys()):
-                    logger.info("  %s = %s", key, str(result[key]))
-                    writer.write("%s = %s\n" % (key, str(result[key])))
+        logger.info("\nBest epoch: {}. Best val acc: {}".format(best_epoch, best_acc))
+        val_f.write("Best epoch: {}. Best val acc: {}\n".format(best_epoch, best_acc))
+        val_f.close()
 
-        with open(os.path.join(args.output_dir, "all_results.txt"), "w") as writer:
-            writer.write("best acc: {}\nepoch: {}".format(best_acc, best_epoch))
-
-        test_weight_path = os.path.join(args.output_dir, WEIGHTS_NAME+str(best_epoch))
+        test_weight_path = os.path.join(args.output_dir, "all_models", "e{}_{}".format(best_epoch, WEIGHTS_NAME))
         test_result = evaluate(args, model, test_weight_path, processor, device, task_name, "test", label_list, tokenizer, output_mode, num_labels)
-        test_output_eval_file = os.path.join(args.output_dir, "test_eval_results.txt")
+        test_res_file = os.path.join(args.output_dir, "test_results.txt")
 
-        with open(test_output_eval_file, "w") as writer:
-            logger.info("***** Test Eval results *****")
+        logger.info("***** Test Eval results *****")
+        with open(test_res_file, "w") as test_f:
             for key in sorted(test_result.keys()):
-                logger.info("  %s = %s", key, str(test_result[key]))
-                writer.write("%s = %s\n" % (key, str(test_result[key])))
+                logger.info("{} = {}".format(key, str(test_result[key])))
+                test_f.write("{} = {}\n".format(key, str(test_result[key])))
+        
+        best_model_dir = os.path.join(args.output_dir, "best_model")
+        os.makedirs(best_model_dir, exist_ok=True)
+        os.system("cp {} {}/{}".format(test_weight_path, best_model_dir, WEIGHTS_NAME))
+        if not args.save_all:
+            os.system("rm -r {}".format(os.path.join(args.output_dir, "all_models")))
 
 
 def evaluate(args, model, weight_path, processor, device, task_name, mode, label_list, tokenizer, output_mode, num_labels, ):
@@ -597,7 +521,6 @@ def evaluate(args, model, weight_path, processor, device, task_name, mode, label
 
     eval_loss = eval_loss / nb_eval_steps
     preds = preds[0]
-    # print(preds[0])
     if output_mode == "classification":
         preds = np.argmax(preds, axis=1)
     elif output_mode == "regression":

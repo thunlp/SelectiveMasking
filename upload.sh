@@ -11,4 +11,4 @@ else
     fi
 fi
 echo ${server}
-rsync -avzp ./* ${server}:~/nvidia-bert
+rsync -avzp ./* ${server}:~/nvidia-bert-2
