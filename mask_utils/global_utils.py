@@ -31,7 +31,7 @@ def zero_digits(s):
 def load_bert_sentences(bert_data_dir, zeros):
     files = os.listdir(bert_data_dir)
     all_sentences = []
-    for file in files:
+    for file in tqdm(files):
         f = open(os.path.join(bert_data_dir, file))
         sentences = f.readlines()
         # line = zero_digits(line.rstrip()) if zeros else line.rstrip()
@@ -66,6 +66,17 @@ def mask_sentence(s, mask_num=0, mask_rate=0):
         else:
             new_s.append(s[i])
     return new_s, rand_list
+
+def mask_1word(s, pos):
+    if len(s) <= 1:
+        return s, []
+    new_s = []
+    for i in range(len(s)):
+        if i == pos:
+            continue
+        else:
+            new_s.append(s[i])
+    return new_s, [pos]
 
 
 def item_detail(pred, masked_pred, mask_pos, print_detail=False):

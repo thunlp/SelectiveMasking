@@ -35,4 +35,5 @@ echo "Creating hdf5 for each text shard"
 mkdir -p ${MERGED_DIR}/hdf5_shards
 export TARGET_DIR=${MERGED_DIR}
 . utils/preprocessing_xargs_wrapper.sh ${N_PROCS_PREPROCESS}
+# chmod 755 utils/pp_origin.sh; . utils/pxw_origin.sh ${N_PROCS_PREPROCESS}
 

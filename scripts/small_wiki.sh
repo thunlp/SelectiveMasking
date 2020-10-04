@@ -1,7 +1,7 @@
-DATA_DIR=${1:-/home/gyx/nvidia-bert/data}
+DATA_DIR=${1:-${HOME}/nvidia-bert/data}
 BERT_MODEL="bert-base-uncased"
 WIKI_DIR="small_wiki_5m_base"
-# WIKI_DIR=${2:-/home/gyx/nvidia-bert/data/small_wiki/}
+# WIKI_DIR=${2:-${HOME}/nvidia-bert/data/small_wiki/}
 
 N_PROCS_PREPROCESS=$(nproc)    # Adjust this based on memory requirements and available number of cores
 

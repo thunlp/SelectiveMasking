@@ -1,82 +1,51 @@
 #!/usr/bin/env bash
 
-init_checkpoint=${1:-"$HOME/checkpoints/bert_uncased.pt"}
-epochs=${2:-"2.0"}
-batch_size=${3:-"3"}
-learning_rate=${4:-"3e-5"}
-precision=${5:-"fp16"}
-num_gpu=${6:-"8"}
-seed=${7:-"1"}
-conll_dir=${8:-"/home/gyx/nvidia-bert/data/CoNll"}
-vocab_file=${9:-"/home/gyx/nvidia-bert/vocab/vocab"}
-OUT_DIR=${10:-"$HOME/nvidia-bert/results/CoNll"}
-mode=${11:-"train eval"}
-CONFIG_FILE=${12:-"$HOME/nvidia-bert/bert_config/bert_base_config.json"}
-max_steps=${13:-"-1"}
-max_seq_length=${14:-"512"}
+# use specified pretrained bert and vocab file 
+CUDA_VISIBLE_DEVICES=5 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/bert-base-cased/bert-base-cased.tar.gz --vocab_file vocab/cased_L-12_H-768_A-12/vocab.txt\
+ --task_name=ner --output_dir=baseline_cased_bert_ner/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 16 --eval_batch_size 8
 
-echo "out dir is $OUT_DIR"
-# mkdir -p $OUT_DIR
-# if [ ! -d "$OUT_DIR" ]; then
-#   echo "ERROR: non existing $OUT_DIR"
-#   exit 1
-# fi
+# uncased use specified pretrained bert and vocab file 
+CUDA_VISIBLE_DEVICES=0 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/bert-base-uncased/bert-base-uncased.tar.gz --vocab_file vocab/uncased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=output_test_uncased/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 32 --eval_batch_size 8 --do_lower_case
 
-use_fp16=""
-if [ "$precision" = "fp16" ] ; then
-  echo "fp16 activated!"
-  use_fp16=" --fp16 "
-fi
 
-if [ "$num_gpu" = "1" ] ; then
-  export CUDA_VISIBLE_DEVICES=0
-  mpi_command=""
-else
-  unset CUDA_VISIBLE_DEVICES
-  mpi_command=" -m torch.distributed.launch --nproc_per_node=$num_gpu"
-fi
+# use pretrained bert and vocab file from huggingface
+CUDA_VISIBLE_DEVICES=1 python3 run_ner.py --data_dir data/CoNll/ --bert_model bert-base-cased --task_name=ner --output_dir=output_test_cased_4/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --cache_dir ~/pretrain_bert_model/ --learning_rate 5e-5 --do_train --train_batch_size 16 --eval_batch_size 8
 
-CMD="python3  $mpi_command run_ner.py "
-CMD+="--init_checkpoint=$init_checkpoint "
-CMD+="--task_name=ner "
-if [ "$mode" = "train" ] ; then
-  CMD+="--do_train "
-  CMD+="--data_dir=$conll_dir "
-  CMD+="--train_batch_size=$batch_size "
-elif [ "$mode" = "eval" ] ; then
-  CMD+="--do_eval "
-  CMD+="--data_dir=$conll_dir "
-  CMD+="--eval_batch_size=$batch_size "
-else
-  CMD+="--do_train "
-  CMD+="--data_dir=$conll_dir "
-  CMD+="--train_batch_size=$batch_size "
-  CMD+="--do_eval "
-  CMD+="--eval_batch_size=$batch_size "
-fi
-CMD+=" --do_lower_case "
-# CMD+=" --old "
-# CMD+=" --loss_scale=128 "
-CMD+=" --bert_model=bert-base-uncased "
-CMD+=" --learning_rate=$learning_rate "
-CMD+=" --seed=$seed "
-CMD+=" --num_train_epochs=$epochs "
-CMD+=" --max_seq_length=$max_seq_length "
-CMD+=" --output_dir=$OUT_DIR "
-CMD+=" --vocab_file=$vocab_file "
-CMD+=" --config_file=$CONFIG_FILE "
-CMD+=" --max_steps=$max_steps "
-CMD+=" $use_fp16"
+# uncased mask
+CUDA_VISIBLE_DEVICES=1 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/uncased_mask_16000/uncased_mask_16000.tar.gz --vocab_file vocab/uncased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=16000_mask_uncased_out/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 32 --eval_batch_size 8 --do_lower_case
 
-LOGFILE=$OUT_DIR/logfile.txt
-echo "$CMD |& tee $LOGFILE"
-time $CMD |& tee $LOGFILE
+#uncased
+CUDA_VISIBLE_DEVICES=1 python3 run_ner.py --data_dir data/CoNll/ --bert_model bert-base-uncased --cache_dir ~/pretrain_bert_model/ \
+--task_name=ner --output_dir=output_uncased/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 32 --eval_batch_size 8 --do_lower_case
 
-#sed -r 's/
-#|([A)/\n/g' $LOGFILE > $LOGFILE.edit
+#uncased origin
+CUDA_VISIBLE_DEVICES=1 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/origin_model/uncased_test.tar.gz --vocab_file vocab/uncased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=output_uncased_origin/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 32 --eval_batch_size 8 --do_lower_case
 
-if [ "$mode" != "eval" ]; then
-throughput=`cat $LOGFILE | grep -E 'Iteration.*[0-9.]+(it/s)' | tail -1 | egrep -o '[0-9.]+(s/it|it/s)' | head -1 | egrep -o '[0-9.]+'`
-train_perf=$(awk 'BEGIN {print ('$throughput' * '$num_gpu' * '$batch_size')}')
-echo " training throughput: $train_perf"
-fi
+# cased mask 40000
+CUDA_VISIBLE_DEVICES=0 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/cased_mask/cased_mask.tar.gz --vocab_file vocab/cased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=cased_mask_bert_ner/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 16 --eval_batch_size 8
+
+CUDA_VISIBLE_DEVICES=0 python3 run_ner.py --data_dir data/CoNll-2/ --bert_model pretrain_bert_model/cased_mask/cased_mask.tar.gz --vocab_file vocab/cased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=cased_mask_bert_ner-2/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 16 --eval_batch_size 8
+
+CUDA_VISIBLE_DEVICES=1 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/cased_mask/cased_mask.tar.gz --vocab_file vocab/cased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=cased_mask_bert_ner/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 16 --eval_batch_size 8
+
+# cased mask 16000
+CUDA_VISIBLE_DEVICES=1 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/2_cased_mask_16000/2_cased_mask_16000.tar.gz --vocab_file vocab/cased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=2_16000_cased_mask_bert_ner/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 16 --eval_batch_size 8
+
+# cased mask 32000
+CUDA_VISIBLE_DEVICES=2 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/cased_mask_32000/cased_mask_32000.tar.gz --vocab_file vocab/cased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=32000_cased_mask_bert_ner/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 16 --eval_batch_size 8
+
+# cased mask 24000
+CUDA_VISIBLE_DEVICES=3 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/cased_mask_24000/cased_mask_24000.tar.gz --vocab_file vocab/cased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=24000_cased_mask_bert_ner/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 16 --eval_batch_size 8
+
+# cased mask 8000
+CUDA_VISIBLE_DEVICES=0 python3 run_ner.py --data_dir data/CoNll/ --bert_model pretrain_bert_model/cased_mask_8000/cased_mask_8000.tar.gz --vocab_file vocab/cased_L-12_H-768_A-12/vocab.txt \
+--task_name=ner --output_dir=8000_cased_mask_bert_ner/ --max_seq_length=128 --num_train_epochs 5 --do_eval --warmup_proportion=0.4 --learning_rate 5e-5 --do_train --train_batch_size 16 --eval_batch_size 8

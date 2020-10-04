@@ -267,32 +267,7 @@ def prepare_dataset(sentences, word_to_id, char_to_id, tag_to_id, lower=True, ma
             'tags': tags,
         })
 
-    # masked data
-    all_masked_data = []
-    for samp in range(mask_samp):
-        masked_data, masked_poses = [], []
-        for s in sentences:
-            new_s, mask_pos = mask_sentence(s, mask_num, mask_rate)
-            # display_diff(s, new_s, mask_pos)
-            str_words = [w[0] for w in new_s]
-            words = [word_to_id[f(w) if f(w) in word_to_id else '<UNK>']
-                     for w in str_words]
-            # Skip characters that are not in the training set
-            chars = [[char_to_id[c] for c in w if c in char_to_id]
-                     for w in str_words]
-            caps = [cap_feature(w) for w in str_words]
-            tags = [tag_to_id[w[-1]] for w in new_s]
-            masked_data.append({
-                'str_words': str_words,
-                'words': words,
-                'chars': chars,
-                'caps': caps,
-                'tags': tags,
-            })
-            masked_poses.append(mask_pos)
-        all_masked_data.append({'data': masked_data, 'pos': masked_poses})
-    
-    return data, all_masked_data
+    return data
 
 
 def augment_with_pretrained(dictionary, ext_emb_path, words):

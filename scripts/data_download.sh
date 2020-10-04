@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-DATA_DIR=${1:-/home/gyx/nvidia-bert/data}
+DATA_DIR=${1:-${HOME}/nvidia-bert/data}
 
 # Check running from repository root
 if [ ! -d .git ]; then

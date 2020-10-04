@@ -47,9 +47,9 @@ printf -v EXTRA_PARAMS "%d %d %e %s 1 %d %d %d false" $train_batch_size $eval_ba
 export ROOTDIR=$root_dir
 export DATA_DIR=${DATA_DIR:-$CODEDIR/data/wikipedia_corpus/pyt_hdf5_shards}
 
-VOLS="-v $ROOTDIR:/home/gyx/nvidia-bert"
-VOLS+=" -v $DATA_DIR:/home/gyx/nvidia-bert/data/wikipedia_corpus/pyt_hdf5_shards"
-# VOLS+=" -v $BOOKS_DIR:/home/gyx/nvidia-bert/data/bookcorpus/final_tfrecord_sharded"
+VOLS="-v $ROOTDIR:${HOME}/nvidia-bert"
+VOLS+=" -v $DATA_DIR:${HOME}/nvidia-bert/data/wikipedia_corpus/pyt_hdf5_shards"
+# VOLS+=" -v $BOOKS_DIR:${HOME}/nvidia-bert/data/bookcorpus/final_tfrecord_sharded"
 VOLS+=" -v $results_dir:/results"
 VOLS+=" -v $checkpoints_dir:/checkpoints"
 

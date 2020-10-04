@@ -6,10 +6,10 @@ import re
 import numpy as np
 
 
-models_path = "mask_utils/ner/models"
-eval_path = "mask_utils/ner//evaluation"
-eval_temp = os.path.join(eval_path, "temp")
-eval_script = os.path.join(eval_path, "conlleval")
+# models_path = "mask_utils/ner/models"
+# eval_path = "mask_utils/ner//evaluation"
+# eval_temp = os.path.join(eval_path, "temp")
+# eval_script = os.path.join(eval_path, "conlleval")
 
 
 def get_name(parameters):

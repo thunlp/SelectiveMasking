@@ -12,16 +12,27 @@ resume_training=${8:-"false"}
 create_logfile=${9:-"true"}
 accumulate_gradients=${10:-"false"}
 gradient_accumulation_steps=${11:-1}
-seed=${12:-42}
+seed=${12:-88}
 job_name=${13:-"job"}
 
 
-DATASET=wiki_train # change this for other datasets
+# DATA_DIR=data/mr_mask_no_stop/yelp_all/hdf5_shards/
+# DATA_DIR=data/mr_mask_no_stop/20w_rand_amazon
+# DATA_DIR=data/absa_lap/full_model_yelp/
+# DATA_DIR=data/absa_lap/full_rand_yelp/
+# DATA_DIR=data/absa_lap/10w_model_yelp/
+# DATA_DIR=data/absa_lap/10w_rand_amazon/
+# DATA_DIR=data/absa_lap/10w_rand_yelp/
+# DATA_DIR=data2/absa_lap/20w_rand_amazon/
+DATA_DIR=data/absa_lap/30w_rand_amazon/
 
-DATA_DIR=data/${DATASET}/hdf5_shards/
-BERT_CONFIG=bert_config/bert_base_config.json
-RESULTS_DIR=${HOME}/nvidia-bert/results
-CHECKPOINTS_DIR=${HOME}/nvidia-bert/results/checkpoints
+
+CKPT=results/small_bert/ckpt_300000/pytorch_model.bin
+
+BERT_CONFIG=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
+BERT_MODEL=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/
+RESULTS_DIR=${HOME}/nvidia-bert/results/absa_lap/30w_rand_amazon
+CHECKPOINTS_DIR=${HOME}/nvidia-bert/results/absa_lap/30w_rand_amazon/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 
@@ -65,13 +76,14 @@ fi
 
 echo $DATA_DIR
 INPUT_DIR=$DATA_DIR
-CMD=" /home/gyx/nvidia-bert/run_pretraining.py"
+CMD=" ${HOME}/nvidia-bert/run_pretraining.py"
 CMD+=" --input_dir=$DATA_DIR"
 CMD+=" --output_dir=$CHECKPOINTS_DIR"
 CMD+=" --config_file=$BERT_CONFIG"
-CMD+=" --bert_model=bert-base-uncased"
+CMD+=" --ckpt=${CKPT}"
+CMD+=" --bert_model=${BERT_MODEL}"
 CMD+=" --train_batch_size=$train_batch_size"
-CMD+=" --max_seq_length=512"
+CMD+=" --max_seq_length=256"
 CMD+=" --max_predictions_per_seq=80"
 CMD+=" --max_steps=$train_steps"
 CMD+=" --warmup_proportion=$warmup_proportion"
