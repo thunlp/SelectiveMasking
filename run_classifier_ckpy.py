@@ -266,8 +266,11 @@ def main():
         print("load from", args.ckpt)
         model_dict = model.state_dict()
         ckpt = torch.load(args.ckpt)
-        pretrained_dict = ckpt['model']
-        new_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict.keys()}
+        if "model" in ckpt:
+            pretrained_dict = ckpt['model']
+        else:
+            pretrained_dict = ckpt    
+        new_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict.keys() and k not in ["classifier.weight", "classifier.bias"]}
         model_dict.update(new_dict)
         print('Total : {}, update: {}'.format(len(pretrained_dict), len(new_dict)))
         model.load_state_dict(model_dict)

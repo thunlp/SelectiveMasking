@@ -23,6 +23,7 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
+from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
@@ -378,7 +379,10 @@ def main():
 
         rate = zeros_num / ones_num
         print("statistic: ", zeros_num, ones_num, rate)
-        sample_weight = torch.HalfTensor([1.0, args.rate]).cuda()
+        if args.fp16:
+            sample_weight = torch.HalfTensor([1.0, args.rate]).cuda()
+        else:
+            sample_weight = torch.FloatTensor([1.0, args.rate]).cuda()
 
         cached_train_features_file = os.path.join(args.data_dir, 'train_{0}_{1}_{2}'.format(
             list(filter(None, args.bert_model.split('/'))).pop(),
@@ -551,6 +555,8 @@ def main():
             right_zero_tokens = 0
             zero_tokens = 0
 
+            y_true_L = []
+            y_pred_L = []
             for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
                 input_ids = input_ids.to(device)
                 input_mask = input_mask.to(device)
@@ -571,14 +577,29 @@ def main():
                 for (m, t, p) in zip(input_mask, y_true, y_pred):
                     for mm, tt, pp in zip(m, t, p):
                         if mm == 1:
+                            y_true_L.append(int(tt))
+                            y_pred_L.append(int(pp))
                             right_tokens += int(tt == pp)
                             all_tokens += 1
                             zero_tokens += int(pp == '0')
                             right_zero_tokens += int(tt == '0')
             
+            acc = accuracy_score(y_true_L, y_pred_L)
+            f1 = f1_score(y_true_L, y_pred_L)
+            recall = recall_score(y_true_L, y_pred_L)
+            prec = precision_score(y_true_L, y_pred_L)
+
+            result = {
+                "acc": acc,
+                "f1": f1,
+                "recall": recall,
+                "prec": prec
+            }
+
             print("Result: {}/{} Rate:{}".format(right_tokens, all_tokens, right_tokens / all_tokens))
             print("Zero tokens: {}/{}".format(zero_tokens, all_tokens))
             print("Right zero tokens: {}/{}".format(right_zero_tokens, all_tokens))
+            print(result)
             # report = classification_report(y_true, y_pred, digits=4)
             # f_score = f1_score(y_true, y_pred)
 

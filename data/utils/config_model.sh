@@ -38,16 +38,16 @@ else
 fi
 
 MODE=model
-TASK_NAME=amazon
+TASK_NAME=yelp
 
 # INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/yelp_review_full_csv/
 # INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/tenk_yelp/
 
 # INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/tenk_amazon/
 # INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/onem_amazon/
-# INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp1/
+INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp1/
 # INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp2/
-INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp3/
+# INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp3/
 
 
 # OUTPUT_DIR=${HOME}/nvidia-bert/data/mr_mask_no_stop/amazon_1/hdf5_shards
@@ -79,7 +79,15 @@ INPUT_DIR=${HOME}/nvidia-bert/data/yelp_amazon/amazon_review_full_csv/tmp3/
 
 # OUTPUT_DIR=${HOME}/nvidia-bert/data/mr_mask_no_stop/20w_model_amazon_1/
 # OUTPUT_DIR=${HOME}/nvidia-bert/data/mr_mask_no_stop/20w_model_amazon_2/
-OUTPUT_DIR=${HOME}/nvidia-bert/data/mr_mask_no_stop/10w_model_amazon_3/
+# OUTPUT_DIR=${HOME}/nvidia-bert/data/mr_mask_no_stop/10w_model_amazon_3/
+
+# OUTPUT_DIR=${HOME}/nvidia-bert/data/absa_lap/full_model_yelp/
+# OUTPUT_DIR=${HOME}/nvidia-bert/data/absa_lap/full_model_amazon/tmp3
+# OUTPUT_DIR=${HOME}/nvidia-bert/data/absa_lap/10w_model_yelp/
+# OUTPUT_DIR=${HOME}/nvidia-bert/data2/absa_lap/20w_model_amazon/tmp3
+# OUTPUT_DIR=${HOME}/nvidia-bert/data2/absa_lap/20w_model_yelp/
+# OUTPUT_DIR=${HOME}/nvidia-bert/data2/absa_lap/30w_model_yelp/
+OUTPUT_DIR=${HOME}/nvidia-bert/data2/absa_lap/30w_model_amazon/tmp1
 
 
 # mask generator
@@ -97,7 +105,9 @@ OUTPUT_DIR=${HOME}/nvidia-bert/data/mr_mask_no_stop/10w_model_amazon_3/
 # BERT_MODEL=${HOME}/nvidia-bert/results/absa/10w_mask_generator/tmp/
 # BERT_MODEL=${HOME}/nvidia-bert/results/absa/20w_mask_generator/tmp/
 # BERT_MODEL=${HOME}/nvidia-bert/results/mr_mask_no_stop/10w_mask_generator/tmp/
-BERT_MODEL=${HOME}/nvidia-bert/results/mr_mask_no_stop/10w_mask_generator/tmp/
+# BERT_MODEL=${HOME}/nvidia-bert/results/mr_mask_no_stop/10w_mask_generator/tmp/
+# BERT_MODEL=${HOME}/nvidia-bert/results/absa_lap/full_mask_generator-2/best
+BERT_MODEL=${HOME}/nvidia-bert/results2/absa_lap/30w_mask_generator/best
 
 # OUTPUT_DIR=${HOME}/nvidia-bert/data/yelp_model_mask/hdf5_shards
 # OUTPUT_DIR=${HOME}/nvidia-bert/data/yelp_mask_info/hdf5_shards

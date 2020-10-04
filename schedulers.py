@@ -1,7 +1,7 @@
 import math
 import torch
 from torch.optim.optimizer import Optimizer
-from apex.optimizers import FP16_Optimizer
+# from apex.optimizers import FP16_Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 
 
@@ -10,14 +10,14 @@ class LRScheduler(_LRScheduler):
         # Check if using mixed precision training
         self.mixed_training = False
         base_optimizer = optimizer
-        if isinstance(optimizer, FP16_Optimizer):
-            self.mixed_training = True
-            self.fp16_optimizer = optimizer
-            base_optimizer = optimizer.optimizer
+        # if isinstance(optimizer, FP16_Optimizer):
+        #     self.mixed_training = True
+        #     self.fp16_optimizer = optimizer
+        #     base_optimizer = optimizer.optimizer
         # Check that optimizer param is valid
-        elif not isinstance(optimizer, Optimizer):
-            raise TypeError('{} is not an Optimizer'.format(
-                type(optimizer).__name__))
+        # elif not isinstance(optimizer, Optimizer):
+        #     raise TypeError('{} is not an Optimizer'.format(
+        #         type(optimizer).__name__))
 
         super(LRScheduler, self).__init__(base_optimizer, last_epoch)
 

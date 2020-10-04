@@ -305,6 +305,7 @@ class ABSATermProcessor(DataProcessor):
         """See base class"""
         lines = self._read_xml(os.path.join(data_dir, "train.xml"))
         data_size = len(lines)
+        print(data_size)
         part_size = data_size // max_proc
         begin = 0
         end = data_size
@@ -317,6 +318,7 @@ class ABSATermProcessor(DataProcessor):
             # end = data_size
             if part == max_proc - 1:
                 end = data_size
+        print(part, max_proc, begin, end)
         examples = []
         for i in range(begin, end):
             line = lines[i]

@@ -174,7 +174,7 @@ def main():
                         type=float, default=0.0,
                         help='Loss scaling, positive power of 2 values can improve fp16 convergence.')
     parser.add_argument('--log_freq',
-                        type=float, default=50.0,
+                        type=float, default=500,
                         help='frequency of logging loss.')
     parser.add_argument('--checkpoint_activations',
                         default=False,
@@ -254,7 +254,9 @@ def main():
     if args.ckpt:
         print("load from", args.ckpt)
         ckpt = torch.load(args.ckpt, map_location='cpu')
-        model.load_state_dict(ckpt['model'], strict=False)
+        if model in ckpt:
+            ckpt = ckpt['model']
+        model.load_state_dict(ckpt, strict=False)
 
     # model_to_save = model.module if hasattr(
         # model, 'module') else model  # Only save the model it-self
@@ -295,8 +297,7 @@ def main():
                                     # warmup=args.warmup_proportion,
                                     # t_total=args.max_steps,
                                     bias_correction=False,
-                                    weight_decay=0.01,
-                                    max_grad_norm=1.0)
+                                    weight_decay=0.01)
 
         if args.loss_scale == 0:
             # optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
@@ -402,8 +403,8 @@ def main():
                 average_loss += loss.item()
 
                 if training_steps % args.gradient_accumulation_steps == 0:
-                    if args.fp16:
-                        scheduler.step()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                    scheduler.step()
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
@@ -411,11 +412,11 @@ def main():
             
 
                 if training_steps == 1 * args.gradient_accumulation_steps:
-                    logger.info("Step:{} Average Loss = {} Step Loss = {} LR {}".format(global_step, average_loss, 
+                    logger.info("Global Step:{} Average Loss = {} Step Loss = {} LR {}".format(global_step, average_loss, 
                                                                                 loss.item(), optimizer.param_groups[0]['lr']))
 
                 if training_steps % (args.log_freq * args.gradient_accumulation_steps) == 0:
-                    logger.info("Step:{} Average Loss = {} Step Loss = {} LR {}".format(global_step,  average_loss / args.log_freq, 
+                    logger.info("Global Step:{} Average Loss = {} Step Loss = {} LR {}".format(global_step,  average_loss / args.log_freq, 
                                                                                 loss.item(), optimizer.param_groups[0]['lr']))
                     average_loss = 0
 

@@ -18,12 +18,16 @@ SEED=$2
 
 # OUTPUT_DIR=results/absa/10w_model_amazon/${SEED}/ckpt_${ITER}
 
-OUTPUT_DIR=results/absa_lap/origin/${SEED}/ckpt_${ITER}
+OUTPUT_DIR=results2/absa_lap/30w_rand_yelp/${SEED}/ckpt_${ITER}
+
+# OUTPUT_DIR=results/absa_lap/full_model_yelp/${SEED}/ckpt_${ITER}
+# OUTPUT_DIR=results/absa_lap/full_rand_yelp/${SEED}/ckpt_${ITER}
 
 
-# CKPT=results/small_bert/ckpt_${ITER}.pt
+# CKPT=results/small_bert/ckpt_${ITER}/pytorch_model.bin
 # CKPT=results/absa/20w_rand_yelp/checkpoints/best_ckpt_${ITER}.pt
-# CKPT=results/absa/10w_model_amazon/checkpoints/best_ckpt_${ITER}.pt
+# CKPT=results/absa_lap/full_rand_yelp/checkpoints/best_ckpt_${ITER}.pt
+CKPT=results2/absa_lap/30w_rand_yelp/checkpoints/best_ckpt_${ITER}.pt
 
 python3 run_classifier_ckpy.py \
     --bert_model=pretrain_bert_model/bert-base-uncased/ \
@@ -40,4 +44,4 @@ python3 run_classifier_ckpy.py \
     --gradient_accumulation_steps 2 \
     --seed=${SEED} \
     --ckpt=${CKPT} \
-    # --fp16 \
+    --fp16 \

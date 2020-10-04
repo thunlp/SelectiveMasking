@@ -12,7 +12,7 @@ DO_LOWER_CASE=true
 DO_WITH_RAND=false
 N_LINES_PER_SHARD_APPROX=99000   # Default=396000 creates 256 shards
 
-N_PROCS_PREPROCESS=2    # Adjust this based on memory requirements and available number of cores
+N_PROCS_PREPROCESS=1    # Adjust this based on memory requirements and available number of cores
 
 BERT_BASE_DIR_CASED="${HOME}/nvidia-bert/vocab/cased_L-12_H-768_A-12"
 BERT_LARGE_DIR_CASED="${HOME}/nvidia-bert/vocab/cased_L-24_H-1024_A-16"
@@ -46,7 +46,8 @@ INPUT_DIR=${HOME}/nvidia-bert/data/Aspect-Based-Sentiment-Analysis/14data_lap/
 
 # OUTPUT_DIR=${HOME}/nvidia-bert/data/absa/20w_absa_mask/
 # OUTPUT_DIR=${HOME}/nvidia-bert/data/absa/20w_absa_mask/
-OUTPUT_DIR=${HOME}/nvidia-bert/data/absa_lap/full_absa_mask/
+# OUTPUT_DIR=${HOME}/nvidia-bert/data/absa_lap/full_absa_mask/
+OUTPUT_DIR=${HOME}/nvidia-bert/data2/absa_lap/30w_absa_mask/
 
 
 
@@ -54,7 +55,8 @@ OUTPUT_DIR=${HOME}/nvidia-bert/data/absa_lap/full_absa_mask/
 # BERT_MODEL=${HOME}/nvidia-bert/results/mr/temp/
 # BERT_MODEL=${HOME}/nvidia-bert/results/yelp_all_rand_10dup/mask_gen/
 # BERT_MODEL=${HOME}/nvidia-bert/results/absa/small_bert/tmp_20w/
-BERT_MODEL=${HOME}/nvidia-bert/results/absa_lap/origin/42/ckpt_0/
+# BERT_MODEL=${HOME}/nvidia-bert/results/absa_lap/origin/42/ckpt_0/
+BERT_MODEL=${HOME}/nvidia-bert/results2/absa_lap/origin/42/ckpt_300000/
 
 TOP_SEN_RATE=1
 THRESHOLD=0.01

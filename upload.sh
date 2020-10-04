@@ -4,8 +4,10 @@ if [ $id = 1 ]; then
 else
     if [ $id = 2 ]; then
         server="newnlp2"
+    elif [ $id = 3 ]; then
+        server="newnlp3"
     else
-        server="v100"
+        server="nlp193"
     fi
 fi
 echo ${server}
