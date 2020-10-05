@@ -1,25 +1,8 @@
-# coding=utf-8
-# Copyright 2018 The Google AI Language Team Authors and The HugginFace Inc. team.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""BERT finetuning runner."""
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 
-# ==================
 import csv
 import os
 import logging
@@ -36,19 +19,14 @@ import math
 from apex import amp
 import json
 
+from model.tokenization import BertTokenizer
+from model.modeling import BertForMaskedLM, BertConfig
+from model.optimization import BertAdam, BertAdam_FP16
+from model.file_utils import PYTORCH_PRETRAINED_BERT_CACHE
+from model.schedulers import LinearWarmUpScheduler
 
-
-from tokenization import BertTokenizer
-from modeling import BertForMaskedLM, BertConfig
-from optimization import BertAdam, BertAdam_FP16
-
-# from fused_adam_local import FusedAdamBert
-from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
-
-from apex.optimizers import FusedAdam #, FP16_Optimizer
-# from apex.optimizers import FusedAdam
+from apex.optimizers import FusedAdam
 from apex.parallel import DistributedDataParallel as DDP
-from schedulers import LinearWarmUpScheduler
 
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',
@@ -93,7 +71,6 @@ class pretraining_dataset(Dataset):
 
 def main():    
 
-    print("IN NEW MAIN XD\n")
     parser = argparse.ArgumentParser()
 
     ## Required parameters
@@ -102,12 +79,6 @@ def main():
                         type=str,
                         required=True,
                         help="The input data dir. Should contain .hdf5 files  for the task.")
-
-    parser.add_argument("--config_file",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="The BERT model config")
 
     parser.add_argument("--bert_model", default="bert-large-uncased", type=str,
                         help="Bert pre-trained model selected in the list: bert-base-uncased, "
@@ -120,6 +91,10 @@ def main():
                         help="The output directory where the model checkpoints will be written.")
 
     ## Other parameters
+    parser.add_argument("--config_file",
+                        default=None,
+                        type=str,
+                        help="The BERT model config")
     parser.add_argument("--ckpt", 
                         default="",
                         type=str)
@@ -198,18 +173,16 @@ def main():
     parser.add_argument('--dev_batch_size',
                         type=int,
                         default=16)
+    parser.add_argument("--save_total_limit", type=int, default=10)
 
     args = parser.parse_args()
-
 
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     
-    
     min_dev_loss = 1000000
     best_step = 0
-
 
     assert(torch.cuda.is_available())
     print(args.local_rank)
@@ -244,7 +217,9 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
 
     # Prepare model
-    config = BertConfig.from_json_file(args.config_file)
+    if args.config_file:
+        config = BertConfig.from_json_file(args.config_file)
+
     if args.bert_model:
         model = BertForMaskedLM.from_pretrained(args.bert_model)
     else:
@@ -258,10 +233,7 @@ def main():
             ckpt = ckpt['model']
         model.load_state_dict(ckpt, strict=False)
 
-    # model_to_save = model.module if hasattr(
-        # model, 'module') else model  # Only save the model it-self
-    pretrained_model_file = os.path.join(
-        args.output_dir, "pytorch_model.bin")
+    pretrained_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
     torch.save(model.state_dict(), pretrained_model_file)
 
     if not args.resume_from_checkpoint:
@@ -288,22 +260,15 @@ def main():
         {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
 
-    
-
     if args.fp16:
-
         optimizer = FusedAdam(optimizer_grouped_parameters,
                                     lr=args.learning_rate,
-                                    # warmup=args.warmup_proportion,
-                                    # t_total=args.max_steps,
                                     bias_correction=False,
                                     weight_decay=0.01)
 
         if args.loss_scale == 0:
-            # optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
             model, optimizer = amp.initialize(model, optimizer, opt_level="O2", keep_batchnorm_fp32=False, loss_scale="dynamic")
         else:
-            # optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
             model, optimizer = amp.initialize(model, optimizer, opt_level="O2", keep_batchnorm_fp32=False, loss_scale=args.loss_scale)
 
         scheduler = LinearWarmUpScheduler(optimizer, warmup=args.warmup_proportion, total_steps=args.max_steps)
@@ -314,19 +279,14 @@ def main():
                                 warmup=args.warmup_proportion,
                                 t_total=args.max_steps)
         
-
-
     if args.resume_from_checkpoint:
-        optimizer.load_state_dict(checkpoint['optimizer'])  # , strict=False)
-       
-
-        
+        optimizer.load_state_dict(checkpoint['optimizer'])
+               
     if args.local_rank != -1:
         model = DDP(model)
     elif n_gpu > 1:
         model = torch.nn.DataParallel(model)
     
-   
     files = [os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir) if os.path.isfile(os.path.join(args.input_dir, f))]
     files.sort()
 
@@ -340,23 +300,16 @@ def main():
     else:
         dev_sampler = DistributedSampler(dev_data)
         dev_dataloader = DataLoader(dev_data, sampler=dev_sampler, batch_size=args.dev_batch_size, num_workers=4, pin_memory=True)
-        
-
 
     logger.info("***** Running training *****")
-    # logger.info("  Num examples = %d", len(train_data))
-    logger.info("  Batch size = %d", args.train_batch_size)
-    print("  LR = ", args.learning_rate)
+    logger.info("  Batch size = {}".format(args.train_batch_size))
+    logger.info("  LR = {}".format(args.learning_rate))
     
-
-
-
     model.train()
-    print("Training. . .")
+    logger.info(" Training. . .")
 
     most_recent_ckpts_paths = []
 
-    print("Training. . .")
     tr_loss = 0.0 # total added training loss
     average_loss = 0.0 # averaged loss every args.log_freq steps
     epoch = 0
@@ -371,7 +324,7 @@ def main():
             args.resume_from_checkpoint = False
         for f_id in range(f_start_id, len(files)):
             data_file = files[f_id]
-            logger.info("file no %s file %s" %(f_id, data_file))
+            logger.info("file no {} file {}".format(f_id, data_file))
             train_data = pretraining_dataset(input_file=data_file, max_pred_length=args.max_predictions_per_seq)
 
             if args.local_rank == -1:
@@ -394,7 +347,6 @@ def main():
                     loss = loss / args.gradient_accumulation_steps
 
                 if args.fp16:
-                    # optimizer.backward(loss)
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
                 else:
@@ -409,8 +361,6 @@ def main():
                     optimizer.zero_grad()
                     global_step += 1
                 
-            
-
                 if training_steps == 1 * args.gradient_accumulation_steps:
                     logger.info("Global Step:{} Average Loss = {} Step Loss = {} LR {}".format(global_step, average_loss, 
                                                                                 loss.item(), optimizer.param_groups[0]['lr']))
@@ -421,7 +371,6 @@ def main():
                     average_loss = 0
 
                 if training_steps % (args.num_steps_per_checkpoint * args.gradient_accumulation_steps) == 0:
-                    # if global_step >= args.max_steps or training_steps % (args.num_steps_per_checkpoint * args.gradient_accumulation_steps) == 0:
                     logger.info("Begin Eval")
                     model.eval()
                     with torch.no_grad():
@@ -439,14 +388,12 @@ def main():
                             torch.distributed.all_reduce(dev_final_loss)
                         logger.info("Dev Loss: {}".format(dev_final_loss.item()))
                         if dev_final_loss < min_dev_loss:
-                            if os.path.exists(os.path.join(args.output_dir, "best_ckpt_{}".format(best_step))):
-                                os.remove(os.path.join(args.output_dir, "best_ckpt_{}".format(best_step)))
                             best_step = global_step
                             min_dev_loss = dev_final_loss
                             if (not torch.distributed.is_initialized() or (torch.distributed.is_initialized() and torch.distributed.get_rank() == 0)):
                                 logger.info("** ** * Saving best dev loss model ** ** * at step {}".format(best_step))
                                 dev_model_to_save = model.module if hasattr(model, 'module') else model
-                                output_save_file = os.path.join(args.output_dir, "best_ckpt_{}.pt".format(best_step))
+                                output_save_file = os.path.join(args.output_dir, "best_ckpt.pt")
                                 torch.save({'model' : dev_model_to_save.state_dict(),
                                             'optimizer' : optimizer.state_dict(),
                                             'files' : [f_id] + files}, output_save_file)
@@ -461,15 +408,8 @@ def main():
                                 'optimizer' : optimizer.state_dict(), 
                                 'files' : [f_id] + files}, output_save_file)
 
-                        # pretrained_model_file = os.path.join(args.output_dir, "pytorch_model.bin")
-                        # pretrained_config_file = os.path.join(args.output_dir, "bert_config.json")
-                        # torch.save(model_to_save.state_dict(), pretrained_model_file)
-                        # with open(pretrained_config_file, "w") as f:
-                            # json.dump(config, f)
-
-                                
                         most_recent_ckpts_paths.append(output_save_file)
-                        if len(most_recent_ckpts_paths) > 1000:
+                        if len(most_recent_ckpts_paths) > args.save_total_limit:
                             ckpt_to_be_removed = most_recent_ckpts_paths.pop(0)
                             os.remove(ckpt_to_be_removed)
 
@@ -480,17 +420,17 @@ def main():
                             print(tr_loss)
                             torch.distributed.all_reduce(torch.tensor(tr_loss).cuda())
                         logger.info("Total Steps:{} Final Loss = {}".format(training_steps, tr_loss))
+
+                        with open(os.path.join(args.output_dir, "valid_results.txt"), "w") as f:
+                            f.write("Min dev loss: {}\nBest step: {}\n".format(min_dev_loss, best_step))
+
                         return
             del train_dataloader
             del train_sampler
             del train_data       
-            # for obj in gc.get_objects():
-            #  if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
-            #    del obj
 
             torch.cuda.empty_cache()
         epoch += 1
-
 
 if __name__ == "__main__":
     main()

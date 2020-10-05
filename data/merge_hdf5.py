@@ -34,7 +34,7 @@ for i in range(num_files):
 train_data = data[:int((1 - dev_rate) * num_instances)]
 dev_data = data[int((1 - dev_rate) * num_instances):]
 
-for feat, d, name in [(features_trn, train_data, "train.hdf5"), (features_dev, dev_data, "dev.hdf5")]:
+for feat, d, name in [(features_trn, train_data, "train.hdf5"), (features_dev, dev_data, "dev/dev.hdf5")]:
     feat["input_ids"] = np.zeros([num_instances, max_seq_length], dtype="int32")
     feat["input_mask"] = np.zeros([num_instances, max_seq_length], dtype="int32")
     feat["segment_ids"] = np.zeros([num_instances, max_seq_length], dtype="int32")

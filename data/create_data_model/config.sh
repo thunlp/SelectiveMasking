@@ -11,11 +11,11 @@ GPU_LIST=(0 1)    # Adjust this based on memory requirements and available numbe
 MAX_PROC=${#GPU_LIST[@]}
 
 MODE=model
-TASK_NAME=yelp
+TASK_NAME=amazon
 
-INPUT_DIR=${HOME}/SelectiveMasking/data/datasets/yelp_amazon/tenk_yelp/
+INPUT_DIR=${HOME}/SelectiveMasking/data/datasets/yelp_amazon/onem_amazon/
 
-OUTPUT_DIR=${HOME}/SelectiveMasking/data/datasets/test/full_yelp/
+OUTPUT_DIR=${HOME}/SelectiveMasking/data/datasets/test/full_amazon/
 
 # model to generate mask training sets
 BERT_MODEL=${HOME}/SelectiveMasking/results/test/full_mask_generator/best_model/

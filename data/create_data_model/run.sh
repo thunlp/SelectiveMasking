@@ -1,10 +1,7 @@
 source data/create_data_model/config.sh
 
-mkdir -p ${OUTPUT_DIR}
-mkdir -p ${OUTPUT_DIR}/model/
-mkdir -p ${OUTPUT_DIR}/rand/
-mkdir -p ${OUTPUT_DIR}/model/merged
-mkdir -p ${OUTPUT_DIR}/rand/merged
+mkdir -p ${OUTPUT_DIR}/model/merged/dev
+mkdir -p ${OUTPUT_DIR}/rand/merged/dev
 
 source data/create_data_model/xarg_wrapper.sh
 
