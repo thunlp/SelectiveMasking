@@ -51,7 +51,7 @@ class TrainingInstance(object):
 def write_instance_to_example_file(instances, tokenizer, max_seq_length,
                                     max_predictions_per_seq, output_file):
     """Create TF example files from `TrainingInstance`s."""
-    
+    print(output_file)
     total_written = 0
     features = collections.OrderedDict()
     
@@ -89,8 +89,6 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
             masked_lm_weights.append(0.0)
 
         next_sentence_label = 1 if instance.is_random_next else 0
-
-
 
         features["input_ids"][inst_index] = input_ids
         features["input_mask"][inst_index] = input_mask
@@ -397,26 +395,28 @@ def main():
             rng, with_rand=args.with_rand)
 
     if args.part >= 0:
-        output_file = os.path.join(args.output_dir, "{}.hdf5".format(args.part))        
+        output_file = os.path.join(args.output_dir, "model", "{}.hdf5".format(args.part))        
         if args.with_rand:
-            rand_output_file = os.path.join(args.output_dir, "rand_{}.hdf5".format(args.part))
+            rand_output_file = os.path.join(args.output_dir, "rand", "{}.hdf5".format(args.part))
         labeled_output_file = os.path.join(args.output_dir, "{}.pkl".format(args.part))     
     else:
-        output_file = os.path.join(args.output_dir, "0.hdf5") 
+        output_file = os.path.join(args.output_dir, "model", "0.hdf5") 
         if args.with_rand:
-            rand_output_file = os.path.join(args.output_dir, "rand_0.hdf5")
+            rand_output_file = os.path.join(args.output_dir, "rand", "0.hdf5")
         labeled_output_file = os.path.join(args.output_dir, "0.pkl")
     
-    print(len(instances))
-    if args.with_rand:
-        print(len(rand_instances))
-    write_instance_to_example_file(instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, output_file)
-    if args.with_rand:
-        write_instance_to_example_file(rand_instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, rand_output_file)
-
     if args.mode == "rule":
-        print("write labeled data for rule mode")
+        print("Writing labeled data(.pkl) for rule mode")
         write_labeled_data(labeled_data, labeled_output_file)
+    else:
+        print("Writing masked data(.hdf5) for model mode")
+        if args.with_rand:
+            print("Num instances: {}. Num rand instance: {}".format(len(instances), len(rand_instances)))
+            write_instance_to_example_file(instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, output_file)
+            write_instance_to_example_file(rand_instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, rand_output_file)
+        else:
+            print("Num instances: {}.".format(len(instances)))
+            write_instance_to_example_file(instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, labeled_output_file)
 
 if __name__ == "__main__":
     main()
