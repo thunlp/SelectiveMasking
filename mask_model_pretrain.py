@@ -1,29 +1,24 @@
 from __future__ import absolute_import, division, print_function
 
 import argparse
-import csv
-import json
 import logging
 import os
 import random
-import sys
 import pickle
-
 import numpy as np
-import torch
-import torch.nn.functional as F
-from file_utils import PYTORCH_PRETRAINED_BERT_CACHE
-from modeling_classification import (CONFIG_NAME, WEIGHTS_NAME, BertConfig, BertForTokenClassification)
-from optimization import BertAdam, warmup_linear
-from tokenization import BertTokenizer
-from seqeval.metrics import classification_report, f1_score
-from torch import nn
-from torch.nn import CrossEntropyLoss
-from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
-                              TensorDataset)
-from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
 from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
+
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torch.nn import CrossEntropyLoss
+from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, TensorDataset)
+from torch.utils.data.distributed import DistributedSampler
+
+from model.modeling_classification import (CONFIG_NAME, WEIGHTS_NAME, VOCAB_NAME, BertConfig, BertForTokenClassification)
+from model.optimization import BertAdam
+from model.tokenization import BertTokenizer
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S',
@@ -163,15 +158,6 @@ def convert_examples_to_features(examples, label_list, max_seq_length, tokenizer
         assert len(segment_ids) == max_seq_length
         assert len(label_ids) == max_seq_length
 
-        # if ex_index < 5:
-        # logger.info("*** Example ***")
-        # logger.info("guid: %s" % (example.guid))
-        # logger.info("tokens: %s" % " ".join([str(x) for x in tokens]))
-        # logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        # logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        # logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        # logger.info("label: %s (id = %d)" % (example.label, label_ids))
-
         features.append(InputFeatures(input_ids=input_ids,
                                       input_mask=input_mask,
                                       segment_ids=segment_ids,
@@ -267,13 +253,18 @@ def main():
     parser.add_argument('--fp16',
                         action='store_true',
                         help="Whether to use 16-bit float precision instead of 32-bit")
+    parser.add_argument("--fp16_opt_level",
+                        type=str,
+                        default="O1",
+                        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
+                        "See details at https://nvidia.github.io/apex/amp.html")
     parser.add_argument('--loss_scale',
                         type=float, default=0,
                         help="Loss scaling to improve fp16 numeric stability. Only used when fp16 set to True.\n"
                              "0 (default value): dynamic loss scaling.\n"
                              "Positive power of 2: static loss scaling value.\n")
-    parser.add_argument('--rate',
-                        type=float, default=1)
+    parser.add_argument('--sample_weight', type=float, default=1)
+    parser.add_argument("--save_all", action="store_true")
     args = parser.parse_args()
 
     processors = {"maskgen": MaskGenProcessor}
@@ -345,8 +336,6 @@ def main():
     if args.local_rank == 0:
         torch.distributed.barrier()
     
-    if args.fp16:
-        model.half()
     model.to(device)
     if args.local_rank != -1:
         try:
@@ -368,38 +357,23 @@ def main():
     if args.do_train:
         train_examples = processor.get_train_examples(args.data_dir)
         
-        ones_num = 0
-        zeros_num = 0
-        for example in train_examples:
-            for l in example.label:
-                if l == 0:
-                    zeros_num += 1
-                else:
-                    ones_num += 1
-
-        rate = zeros_num / ones_num
-        print("statistic: ", zeros_num, ones_num, rate)
         if args.fp16:
-            sample_weight = torch.HalfTensor([1.0, args.rate]).cuda()
+            sample_weight = torch.HalfTensor([1.0, args.sample_weight]).cuda()
         else:
-            sample_weight = torch.FloatTensor([1.0, args.rate]).cuda()
+            sample_weight = torch.FloatTensor([1.0, args.sample_weight]).cuda()
 
-        cached_train_features_file = os.path.join(args.data_dir, 'train_{0}_{1}_{2}'.format(
-            list(filter(None, args.bert_model.split('/'))).pop(),
-            str(args.max_seq_length),
-            str(task_name)))
-        print(cached_train_features_file)
+        cached_train_features_file = os.path.join(args.data_dir, 'train_{}_{}_{}'.format(list(filter(None, args.bert_model.split('/'))).pop(), str(args.max_seq_length), str(task_name)))
         try:
             with open(cached_train_features_file, "rb") as reader:
+                logger.info("Load from cache dir: {}".format(cached_train_features_file))
                 train_features = pickle.load(reader)
         except:
             train_features = convert_examples_to_features(train_examples, label_list, args.max_seq_length, tokenizer)
             if args.local_rank == -1 or torch.distributed.get_rank() == 0:
-                logger.info("  Saving train features into cached file %s", cached_train_features_file)
+                logger.info("Saving train features into cached file {}".format(cached_train_features_file))
                 with open(cached_train_features_file, "wb") as writer:
                     pickle.dump(train_features, writer)
 
-        
         all_input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long)
         all_input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long)
         all_segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long)
@@ -420,29 +394,17 @@ def main():
             {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
             {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
         ]
+        optimizer = BertAdam(optimizer_grouped_parameters,
+                             lr=args.learning_rate,
+                             warmup=args.warmup_proportion,
+                             t_total=num_train_optimization_steps)
         if args.fp16:
             try:
-                from apex.optimizers import FP16_Optimizer
-                from apex.optimizers import FusedAdam
+                from apex import amp
             except ImportError:
                 raise ImportError(
                     "Please install apex from https://www.github.com/nvidia/apex to use distributed and fp16 training.")
-
-            optimizer = FusedAdam(optimizer_grouped_parameters,
-                                  lr=args.learning_rate,
-                                  bias_correction=False,
-                                  max_grad_norm=1.0)
-            if args.loss_scale == 0:
-                optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
-            else:
-                optimizer = FP16_Optimizer(optimizer, static_loss_scale=args.loss_scale)
-
-        else:
-            optimizer = BertAdam(optimizer_grouped_parameters,
-                                 lr=args.learning_rate,
-                                 warmup=args.warmup_proportion,
-                                 t_total=num_train_optimization_steps)
-
+            model, optimizer = amp.initialize(model, optimizer, opt_level=args.fp16_opt_level)
 
         label_map = {i: label for i, label in enumerate(label_list, 1)}
         
@@ -451,11 +413,11 @@ def main():
         logger.info("  Batch size = %d", args.train_batch_size)
         logger.info("  Num steps = %d", num_train_optimization_steps)
 
-        # warmup_linear = WarmupLinearSchedule(warmup=args.warmup_proportion, t_total=num_train_optimization_steps)
+        os.makedirs(os.path.join(args.output_dir, "all_models"), exist_ok=True)
         model.train()
         for e in trange(int(args.num_train_epochs), desc="Epoch"):
             tr_loss = 0
-            nb_tr_examples, nb_tr_steps = 0, 0
+            nb_tr_steps = 0
             for step, batch in enumerate(tqdm(train_dataloader, desc="Iteration")):
                 batch = tuple(t.to(device) for t in batch)
                 input_ids, input_mask, segment_ids, label_ids = batch
@@ -466,54 +428,41 @@ def main():
                     loss = loss / args.gradient_accumulation_steps
 
                 if args.fp16:
-                    optimizer.backward(loss)
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
                 else:
                     loss.backward()
 
                 tr_loss += loss.item()
-                nb_tr_examples += input_ids.size(0)
                 nb_tr_steps += 1
                 if (step + 1) % args.gradient_accumulation_steps == 0:
-                    if args.fp16:
-                        # modify learning rate with special warm up BERT uses
-                        # if args.fp16 is False, BertAdam is used that handles this automatically
-                        lr_this_step = args.learning_rate * warmup_linear(global_step / num_train_optimization_steps, args.warmup_proportion)
-                        for param_group in optimizer.param_groups:
-                            param_group['lr'] = lr_this_step
                     optimizer.step()
                     optimizer.zero_grad()
                     global_step += 1
-                
-                if step % 100 == 0:
-                    print("\n")
-                    print(tr_loss / (step + 1))
-                    print("\n")
+            # save each epoch
             model_to_save = model.module if hasattr(model, 'module') else model
-            output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME+str(e))
+            output_model_file = os.path.join(args.output_dir, "all_models", "e{}_{}".format(e, WEIGHTS_NAME))
             torch.save(model_to_save.state_dict(), output_model_file)
 
     if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-        model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
-
-        output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME)
-        output_config_file = os.path.join(args.output_dir, CONFIG_NAME)
-
-        torch.save(model_to_save.state_dict(), output_model_file)
-        with open(output_config_file, 'w') as f:
-            f.write(model_to_save.config.to_json_string())
-
         output_args_file = os.path.join(args.output_dir, 'training_args.bin')
         torch.save(args, output_args_file)
     else:
         model = BertForTokenClassification.from_pretrained(args.bert_model, num_labels=num_labels)
 
-
-    model.to(device)
-
+    ### Evaluation
     if args.do_eval and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
+        best_f1 = 0
+        best_epoch = 0
+        val_res_file = os.path.join(args.output_dir, "valid_results.txt")
+        val_f = open(val_res_file, "w")
+        logger.info("***** Dev Eval results *****")
         for e in range(int(args.num_train_epochs)):
-            model.load_state_dict(torch.load(os.path.join(args.output_dir, WEIGHTS_NAME+str(e))))
+            weight_path = os.path.join(args.output_dir, "all_models", "e{}_{}".format(e, WEIGHTS_NAME))
+            model.load_state_dict(torch.load(weight_path))
+            model.to(device)
             eval_examples = processor.get_dev_examples(args.data_dir)
+            
             cached_eval_features_file = os.path.join(args.data_dir, 'dev_{0}_{1}_{2}'.format(
                 list(filter(None, args.bert_model.split('/'))).pop(),
                 str(args.max_seq_length),
@@ -545,18 +494,9 @@ def main():
             eval_dataloader = DataLoader(eval_data, sampler=eval_sampler, batch_size=args.eval_batch_size)
 
             model.eval()
-            eval_loss = 0
-            nb_eval_steps = 0
-            preds = []
-            out_label_ids = None
-
-            all_tokens = 0
-            right_tokens = 0
-            right_zero_tokens = 0
-            zero_tokens = 0
-
             y_true_L = []
             y_pred_L = []
+
             for input_ids, input_mask, segment_ids, label_ids in tqdm(eval_dataloader, desc="Evaluating"):
                 input_ids = input_ids.to(device)
                 input_mask = input_mask.to(device)
@@ -579,16 +519,16 @@ def main():
                         if mm == 1:
                             y_true_L.append(int(tt))
                             y_pred_L.append(int(pp))
-                            right_tokens += int(tt == pp)
-                            all_tokens += 1
-                            zero_tokens += int(pp == '0')
-                            right_zero_tokens += int(tt == '0')
             
             acc = accuracy_score(y_true_L, y_pred_L)
             f1 = f1_score(y_true_L, y_pred_L)
             recall = recall_score(y_true_L, y_pred_L)
             prec = precision_score(y_true_L, y_pred_L)
 
+            if f1 > best_f1:
+                best_f1 = f1
+                best_epoch = e
+            
             result = {
                 "acc": acc,
                 "f1": f1,
@@ -596,13 +536,27 @@ def main():
                 "prec": prec
             }
 
-            print("Result: {}/{} Rate:{}".format(right_tokens, all_tokens, right_tokens / all_tokens))
-            print("Zero tokens: {}/{}".format(zero_tokens, all_tokens))
-            print("Right zero tokens: {}/{}".format(right_zero_tokens, all_tokens))
-            print(result)
-            # report = classification_report(y_true, y_pred, digits=4)
-            # f_score = f1_score(y_true, y_pred)
+            logger.info("Epoch {}".format(e))
+            val_f.write("Epoch {}\n".format(e))
+            for key in sorted(result.keys()):
+                logger.info("{} = {}".format(key, str(result[key])))
+                val_f.write("{} = {}\n".format(key, str(result[key])))
+            val_f.write("\n")
 
+        logger.info("\nBest epoch: {}. Best val f1: {}".format(best_epoch, best_f1))
+        val_f.write("Best epoch: {}. Best val f1: {}\n".format(best_epoch, best_f1))
+        val_f.close()
+
+        best_weight_path = os.path.join(args.output_dir, "all_models", "e{}_{}".format(best_epoch, WEIGHTS_NAME))
+        best_model_dir = os.path.join(args.output_dir, "best_model")
+        os.makedirs(best_model_dir, exist_ok=True)
+        os.system("cp {} {}/{}".format(best_weight_path, best_model_dir, WEIGHTS_NAME))
+        with open(os.path.join(best_model_dir, CONFIG_NAME), 'w') as f:
+            f.write(model_to_save.config.to_json_string())
+        tokenizer.save_vocab(os.path.join(best_model_dir, VOCAB_NAME))
+
+        if not args.save_all:
+            os.system("rm -r {}".format(os.path.join(args.output_dir, "all_models")))
 
 if __name__ == "__main__":
     main()
