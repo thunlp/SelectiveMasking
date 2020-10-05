@@ -37,13 +37,13 @@ PRETRAINED_VOCAB_ARCHIVE_MAP = {
     # 'bert-base-multilingual-cased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-multilingual-cased-vocab.txt",
     # 'bert-base-chinese': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-chinese-vocab.txt",
 
-    'bert-base-uncased': home + "/nvidia-bert/vocab/uncased_L-12_H-768_A-12/vocab.txt",
-    'bert-large-uncased': home + "/nvidia-bert/vocab/uncased_L-24_H-1024_A-16/vocab.txt",
-    'bert-base-cased': home + "/nvidia-bert/vocab/cased_L-12_H-768_A-12/vocab.txt",
-    'bert-large-cased': home + "/nvidia-bert/vocab/cased_L-24_H-1024_A-16/vocab.txt",
-    'bert-base-multilingual-uncased': home + "/nvidia-bert/vocab/multilingual_L-12_H-768_A-12/vocab.txt",
-    'bert-base-multilingual-cased': home + "/nvidia-bert/vocab/multi_cased_L-12_H-768_A-12/vocab.txt",
-    'bert-base-chinese': home + "/nvidia-bert/vocab/chinese_L-12_H-768_A-12/vocab.txt",
+    'bert-base-uncased': home + "/SelectiveMasking/vocab/uncased_L-12_H-768_A-12/vocab.txt",
+    'bert-large-uncased': home + "/SelectiveMasking/vocab/uncased_L-24_H-1024_A-16/vocab.txt",
+    'bert-base-cased': home + "/SelectiveMasking/vocab/cased_L-12_H-768_A-12/vocab.txt",
+    'bert-large-cased': home + "/SelectiveMasking/vocab/cased_L-24_H-1024_A-16/vocab.txt",
+    'bert-base-multilingual-uncased': home + "/SelectiveMasking/vocab/multilingual_L-12_H-768_A-12/vocab.txt",
+    'bert-base-multilingual-cased': home + "/SelectiveMasking/vocab/multi_cased_L-12_H-768_A-12/vocab.txt",
+    'bert-base-chinese': home + "/SelectiveMasking/vocab/chinese_L-12_H-768_A-12/vocab.txt",
 }
 PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP = {
     'bert-base-uncased': 512,
@@ -55,26 +55,6 @@ PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP = {
     'bert-base-chinese': 512,
 }
 VOCAB_NAME = 'vocab.txt'
-
-def convert_to_unicode(text):
-  """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
-  if six.PY3:
-    if isinstance(text, str):
-      return text
-    elif isinstance(text, bytes):
-      return text.decode("utf-8", "ignore")
-    else:
-      raise ValueError("Unsupported string type: %s" % (type(text)))
-  elif six.PY2:
-    if isinstance(text, str):
-      return text.decode("utf-8", "ignore")
-    elif isinstance(text, unicode):
-      return text
-    else:
-      raise ValueError("Unsupported string type: %s" % (type(text)))
-  else:
-    raise ValueError("Not running on Python2 or Python 3?")
-
 
 def load_vocab(vocab_file):
     """Loads a vocabulary file into a dictionary."""
@@ -143,6 +123,24 @@ class BertTokenizer(object):
         for i in ids:
             tokens.append(self.ids_to_tokens[i])
         return tokens
+
+    def save_vocab(self, vocab_path):
+        index = 0
+        if os.path.isdir(vocab_path):
+            vocab_file = os.path.join(vocab_path, VOCAB_NAME)
+        else:
+            vocab_file = vocab_path
+        with open(vocab_file, "w", encoding="utf-8") as writer:
+            for token, token_index in sorted(self.vocab.items(), key=lambda kv: kv[1]):
+                if index != token_index:
+                    logger.warning(
+                        "Saving vocabulary to {}: vocabulary indices are not consecutive."
+                        " Please check that the vocabulary is not corrupted!".format(vocab_file)
+                    )
+                    index = token_index
+                writer.write(token + "\n")
+                index += 1
+        return (vocab_file,)
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, cache_dir=None, *inputs, **kwargs):

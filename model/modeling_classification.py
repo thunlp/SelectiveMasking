@@ -48,6 +48,7 @@ PRETRAINED_MODEL_ARCHIVE_MAP = {
 }
 CONFIG_NAME = 'bert_config.json'
 WEIGHTS_NAME = 'pytorch_model.bin'
+VOCAB_NAME = 'vocab.txt'
 TF_WEIGHTS_NAME = 'model.ckpt'
 
 def load_tf_weights_in_bert(model, tf_checkpoint_path):

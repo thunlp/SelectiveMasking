@@ -4,5 +4,5 @@ ITER=$1
 
 for SEED in ${SEED_ARRAY[@]}
 do
-    bash $HOME/nvidia-bert/run_test.sh ${SEED}
+    bash $HOME/SelectiveMasking/run_test.sh ${SEED}
 done

@@ -1,17 +1,3 @@
-# coding=utf-8
-# Copyright 2018 The Google AI Language Team Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 """Create masked LM/next sentence masked_lm TF examples for BERT."""
 from __future__ import absolute_import, division, print_function, unicode_literals
 
@@ -20,24 +6,21 @@ import argparse
 import logging
 import os
 import random
-from io import open
 import h5py
 import numpy as np
-from tqdm import tqdm, trange
+import collections
 import json
 import pickle
+import sys
+from tqdm import tqdm, trange
 
+sys.path.append("../")
+
+import model.tokenization as tokenization
 from tokenization import BertTokenizer
-import tokenization as tokenization
-
-import random
-import collections
-import mask_utils.mask_generators as mask_generators
-from run_classifier_dataset_utils import processors
-from sc_mask_gen import SC, ModelGen, ASC
-from rand_mask_gen import RandMask
-
-
+from data.data_utils import processors
+from data.sc_mask_gen import SC, ModelGen, ASC
+from data.rand_mask_gen import RandMask
 
 class TrainingInstance(object):
     """A single training instance (sentence pair)."""
@@ -118,21 +101,6 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
 
         total_written += 1
 
-        # if inst_index < 20:
-        #   tf.logging.info("*** Example ***")
-        #   tf.logging.info("tokens: %s" % " ".join(
-        #       [tokenization.printable_text(x) for x in instance.tokens])      
-        #   for feature_name in features.keys():
-        #     feature = features[feature_name]
-        #     values = []
-        #     if feature.int64_list.value:
-        #       values = feature.int64_list.value
-        #     elif feature.float_list.value:
-        #       values = feature.float_list.value
-        #     tf.logging.info(
-        #         "%s: %s" % (feature_name, " ".join([str(x) for x in values])))
-
-
     print("saving data")
     f= h5py.File(output_file, 'w')
     f.create_dataset("input_ids", data=features["input_ids"], dtype='i4', compression='gzip')
@@ -147,10 +115,6 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
 def write_labeled_data(labeled_data, output_file):
     with open(output_file, "wb") as f:
         pickle.dump(labeled_data, f)
-
-def split_mask(all_documents, num_parts, rng):
-    pass        
-
 
 def create_training_instances(data, all_labels, task_name, generator, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng, with_rand=False):
     """Create `TrainingInstance`s from raw text."""
@@ -203,22 +167,10 @@ def create_instances_from_document(
     # Account for [CLS], [SEP]
     max_num_tokens = max_seq_length - 2
 
-    # We *usually* want to fill up the entire sequence since we are padding
-    # to `max_seq_length` anyways, so short sequences are generally wasted
-    # computation. However, we *sometimes*
-    # (i.e., short_seq_prob == 0.1 == 10% of the time) want to use shorter
-    # sequences to minimize the mismatch between pre-training and fine-tuning.
-    # The `target_seq_length` is just a rough target however, whereas
-    # `max_seq_length` is a hard limit.
     target_seq_length = max_num_tokens
     if rng.random() < short_seq_prob:
         target_seq_length = rng.randint(2, max_num_tokens)
 
-    # We DON'T just concatenate all of the tokens from a document into a long
-    # sequence and choose an arbitrary split point because this would make the
-    # next sentence prediction task too easy. Instead, we split the input into
-    # segments "A" and "B" based on the actual "sentences" provided by the user
-    # input.
     instances = []
     current_chunk = []
     current_length = 0
@@ -229,22 +181,14 @@ def create_instances_from_document(
         current_length += len(segment.tokens)
         if i == len(document) - 1 or current_length >= target_seq_length:
             if current_chunk:
-                # `a_end` is how many segments from `current_chunk` go into the `A`
-                # (first) sentence.
-                # a_end = 1
-                # if len(current_chunk) >= 2:
-                #   a_end = rng.randint(1, len(current_chunk) - 1)
-
                 tokens_a = []
                 m_info_a = []
-                # for j in range(a_end):
                 for j in range(len(current_chunk)):
                     tokens_a.extend(current_chunk[j].tokens)
                     m_info_a.extend(current_chunk[j].info)
                 truncate_seq_pair(tokens_a, m_info_a, [], [], max_num_tokens, rng)
 
                 assert len(tokens_a) >= 1
-                # assert len(tokens_b) >= 1
 
                 tokens = []
                 m_info = []
@@ -266,7 +210,6 @@ def create_instances_from_document(
                     rng.shuffle(masked_lm_positions)
                     masked_lm_positions = masked_lm_positions[0:max_predictions_per_seq]
                     masked_lm_positions.sort()
-                # masks = [m_info[pos]["mask"] for pos in masked_lm_positions]
                 masked_lm_labels = [m_info[pos]["label"] for pos in masked_lm_positions]
                 
                 for pos in masked_lm_positions:
@@ -280,7 +223,6 @@ def create_instances_from_document(
                     masked_lm_positions=masked_lm_positions,
                     masked_lm_labels=masked_lm_labels)
                 instances.append(instance)
-                # print(tokens, masked_lm_positions, masked_lm_labels)
             current_chunk = []
             current_length = 0  
         i += 1
@@ -342,9 +284,6 @@ def main():
                         default="", 
                         type=str,
                         required=False)
-    parser.add_argument("--gpus", 
-                        default=0,
-                        type=int)
     parser.add_argument("--local_rank",
                         default=0,
                         type=int)
@@ -431,8 +370,8 @@ def main():
     del eval_examples
     
     label_list = processor.get_labels()
-    logger.info("Bert Model: " + args.bert_model)
-    print(torch.cuda.is_available())
+    logger.info("Bert Model: {}".format(args.bert_model))
+
     if args.mode == "rand":
         print("Mode: rand")
         generator = RandMask(args.masked_lm_prob, args.bert_model, args.do_lower_case, args.max_seq_length)
@@ -445,8 +384,7 @@ def main():
     else:
         print("Mode: model")
         generator = ModelGen(args.masked_lm_prob, args.bert_model, args.do_lower_case, args.max_seq_length, args.sentence_batch_size, with_rand=args.with_rand)
-    # input_files = []
-    # print(args.part)
+
     if args.with_rand:
         instances, rand_instances, labeled_data = create_training_instances(
             data, all_labels, args.task_name, generator, args.max_seq_length, args.dupe_factor,

@@ -15,11 +15,11 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn import CrossEntropyLoss, MSELoss
 
-from modeling_classification import BertForSequenceClassification, WEIGHTS_NAME, CONFIG_NAME
-from tokenization import BertTokenizer
-from optimization import BertAdam, warmup_linear
+from model.modeling_classification import BertForSequenceClassification, WEIGHTS_NAME, CONFIG_NAME, VOCAB_NAME
+from model.tokenization import BertTokenizer
+from model.optimization import BertAdam, warmup_linear
 
-from run_classifier_dataset_utils import processors, output_modes, convert_examples_to_features, compute_metrics
+from data.data_utils import processors, output_modes, convert_examples_to_features, compute_metrics
 
 if sys.version_info[0] == 2:
     import cPickle as pickle
@@ -369,20 +369,12 @@ def main():
 
     ### Saving best-practices: if you use defaults names for the model, you can reload it using from_pretrained()
     if args.do_train and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-        # Save a trained model, configuration and tokenizer
-        model_to_save = model.module if hasattr(model, 'module') else model  # Only save the model it-self
 
-        # If we save using the predefined names, we can load using `from_pretrained`
-        output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME)
-        output_config_file = os.path.join(args.output_dir, CONFIG_NAME)
-
-        torch.save(model_to_save.state_dict(), output_model_file)
-        with open(output_config_file, 'w') as f:
-            f.write(model_to_save.config.to_json_string())
-
-        # Good practice: save your training arguments together with the trained model
         output_args_file = os.path.join(args.output_dir, 'training_args.bin')
         torch.save(args, output_args_file)
+
+
+
     else:
         model = BertForSequenceClassification.from_pretrained(args.bert_model, num_labels=num_labels)
 
@@ -424,6 +416,10 @@ def main():
         best_model_dir = os.path.join(args.output_dir, "best_model")
         os.makedirs(best_model_dir, exist_ok=True)
         os.system("cp {} {}/{}".format(test_weight_path, best_model_dir, WEIGHTS_NAME))
+        with open(os.path.join(best_model_dir, CONFIG_NAME), 'w') as f:
+            f.write(model_to_save.config.to_json_string())
+        tokenizer.save_vocab(os.path.join(best_model_dir, VOCAB_NAME))
+
         if not args.save_all:
             os.system("rm -r {}".format(os.path.join(args.output_dir, "all_models")))
 

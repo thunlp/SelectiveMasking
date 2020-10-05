@@ -3,18 +3,18 @@ import torch
 import torch.nn as nn
 import numpy as np
 import spacy
+import sys
 import collections
 from tqdm import tqdm
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.functional import softmax
 
-from tokenization import BertTokenizer
+sys.path.append("../")
+from model.tokenization import BertTokenizer
 
 logger = logging.getLogger(__name__)
-MaskedTokenInstance = collections.namedtuple(
-    "MaskedTokenInstance", ["tokens", "info"])
-MaskedItemInfo = collections.namedtuple("MaskedItemInfo", [
-                                        "current_pos", "sen_doc_pos", "sen_right_id", "doc_ground_truth"])
+MaskedTokenInstance = collections.namedtuple("MaskedTokenInstance", ["tokens", "info"])
+MaskedItemInfo = collections.namedtuple("MaskedItemInfo", ["current_pos", "sen_doc_pos", "sen_right_id", "doc_ground_truth"])
 
 
 class InputFeatures(object):
@@ -27,14 +27,13 @@ class InputFeatures(object):
 class RandMask(nn.Module):
     def __init__(self, mask_rate, bert_model, do_lower_case, max_seq_length):
         super(RandMask, self).__init__()
-        self.mask_rate = mask_rate  # bert 里面的mask_rate，现在没有用
-        self.max_seq_length = max_seq_length  # bert里面的max_seq_length
+        self.mask_rate = mask_rate
+        self.max_seq_length = max_seq_length
         self.tokenizer = BertTokenizer.from_pretrained(
             bert_model, do_lower_case=do_lower_case)
         self.vocab = list(self.tokenizer.vocab.keys())
 
     def forward(self, data, all_labels, dupe_factor, rng):
-        # 输入没有tokenized 的段，和每段对应的分类结果
         # data: not tokenized
         all_documents = []
         for _ in range(dupe_factor):

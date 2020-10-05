@@ -29,10 +29,10 @@ DATA_DIR=data/absa_lap/30w_rand_amazon/
 
 CKPT=results/small_bert/ckpt_300000/pytorch_model.bin
 
-BERT_CONFIG=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/bert_config.json
-BERT_MODEL=${HOME}/nvidia-bert/pretrain_bert_model/bert-base-uncased/
-RESULTS_DIR=${HOME}/nvidia-bert/results/absa_lap/30w_rand_amazon
-CHECKPOINTS_DIR=${HOME}/nvidia-bert/results/absa_lap/30w_rand_amazon/checkpoints
+BERT_CONFIG=${HOME}/SelectiveMasking/pretrain_bert_model/bert-base-uncased/bert_config.json
+BERT_MODEL=${HOME}/SelectiveMasking/pretrain_bert_model/bert-base-uncased/
+RESULTS_DIR=${HOME}/SelectiveMasking/results/absa_lap/30w_rand_amazon
+CHECKPOINTS_DIR=${HOME}/SelectiveMasking/results/absa_lap/30w_rand_amazon/checkpoints
 
 mkdir -p $CHECKPOINTS_DIR
 
@@ -76,7 +76,7 @@ fi
 
 echo $DATA_DIR
 INPUT_DIR=$DATA_DIR
-CMD=" ${HOME}/nvidia-bert/run_pretraining.py"
+CMD=" ${HOME}/SelectiveMasking/run_pretraining.py"
 CMD+=" --input_dir=$DATA_DIR"
 CMD+=" --output_dir=$CHECKPOINTS_DIR"
 CMD+=" --config_file=$BERT_CONFIG"
