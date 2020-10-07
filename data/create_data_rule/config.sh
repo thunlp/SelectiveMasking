@@ -18,7 +18,7 @@ INPUT_DIR=${HOME}/SelectiveMasking/data/datasets/Aspect-Based-Sentiment-Analysis
 OUTPUT_DIR=${HOME}/SelectiveMasking/data/datasets/test/full_rule_mask/
 
 # model to generate mask training sets
-BERT_MODEL=${HOME}/SelectiveMasking/results/test/origin/42/ckpt_1M/best_model/
+BERT_MODEL=${HOME}/SelectiveMasking/results/test/origin/CKPT_1M/42/best_model/
 
 TOP_SEN_RATE=1
 THRESHOLD=0.01

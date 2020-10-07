@@ -171,6 +171,7 @@ def main():
                              "Positive power of 2: static loss scaling value.\n")
     parser.add_argument("--ckpt", type=str, help="ckpt position")
     parser.add_argument("--save_all", action="store_true")
+    parser.add_argument("--output_dev_detail", action="store_true")
     args = parser.parse_args()
 
     if args.local_rank == -1 or args.no_cuda:
@@ -386,10 +387,12 @@ def main():
                 best_acc = result["acc"]
                 best_epoch = e
 
-            logger.info("Epoch {}".format(e))
+            if args.output_dev_detail:
+                logger.info("Epoch {}".format(e))
             val_f.write("Epoch {}\n".format(e))
             for key in sorted(result.keys()):
-                logger.info("{} = {}".format(key, str(result[key])))
+                if args.output_dev_detail:
+                    logger.info("{} = {}".format(key, str(result[key])))
                 val_f.write("{} = {}\n".format(key, str(result[key])))
             val_f.write("\n")
 

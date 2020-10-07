@@ -1,8 +1,9 @@
-SEED=${1:-42}
+SEED=$1
 
 DATA_DIR=data/datasets/Aspect-Based-Sentiment-Analysis/14data_lap/
 BERT_MODEL=pretrain_bert_model/bert-base-uncased/
-OUTPUT_DIR=results/test/origin/CKPT_1M/${SEED}
+OUTPUT_DIR=results/test/full_amazon/model/${SEED}
+CKPT=results/test/full_amazon/model/checkpoints/best_ckpt.pt
 
 CMD="finetune.py"
 CMD+=" --bert_model=${BERT_MODEL}"
@@ -19,6 +20,7 @@ CMD+=" --do_lower_case"
 CMD+=" --gradient_accumulation_steps 2"
 CMD+=" --seed=${SEED}"
 CMD+=" --fp16"
+CMD+=" --ckpt ${CKPT}"
 
 CMD="python3 ${CMD}"
 
