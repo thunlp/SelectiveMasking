@@ -129,3 +129,4 @@ tensorflow_code
 models
 
 *.un~
+upload.sh
