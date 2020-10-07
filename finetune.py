@@ -379,10 +379,11 @@ def main():
         best_epoch = 0
         val_res_file = os.path.join(args.output_dir, "valid_results.txt")
         val_f = open(val_res_file, "w")
-        logger.info("***** Dev Eval results *****")
-        for e in range(int(args.num_train_epochs)):
+        if args.output_dev_detail:
+            logger.info("***** Dev Eval results *****")
+        for e in tqdm(range(int(args.num_train_epochs)), desc="Epoch on dev"):
             weight_path = os.path.join(args.output_dir, "all_models", "e{}_{}".format(e, WEIGHTS_NAME))
-            result = evaluate(args, model, weight_path, processor, device, task_name, "dev", label_list, tokenizer, output_mode, num_labels)
+            result = evaluate(args, model, weight_path, processor, device, task_name, "dev", label_list, tokenizer, output_mode, num_labels, show_detail=False)
             if result["acc"] > best_acc:
                 best_acc = result["acc"]
                 best_epoch = e
@@ -421,10 +422,13 @@ def main():
             os.system("rm -r {}".format(os.path.join(args.output_dir, "all_models")))
 
 
-def evaluate(args, model, weight_path, processor, device, task_name, mode, label_list, tokenizer, output_mode, num_labels, ):
+def evaluate(args, model, weight_path, processor, device, task_name, mode, label_list, tokenizer, output_mode, num_labels, show_detail=True):
     model.load_state_dict(torch.load(weight_path))
     model.to(device)
-    print("Loading From: ", weight_path)
+
+    if show_detail:
+        print("Loading From: ", weight_path)
+    
     if mode == "test":
         eval_examples = processor.get_test_examples(args.data_dir)
         cached_eval_features_file = os.path.join(args.data_dir, 'test_{0}_{1}_{2}'.format(
@@ -450,9 +454,10 @@ def evaluate(args, model, weight_path, processor, device, task_name, mode, label
             with open(cached_eval_features_file, "wb") as writer:
                 pickle.dump(eval_features, writer)
 
-    logger.info("***** Running evaluation *****")
-    logger.info("  Num examples = %d", len(eval_examples))
-    logger.info("  Batch size = %d", args.eval_batch_size)
+    if show_detail:
+        logger.info("***** Running evaluation *****")
+        logger.info("  Num examples = %d", len(eval_examples))
+        logger.info("  Batch size = %d", args.eval_batch_size)
     all_input_ids = [f.input_ids for f in eval_features]
     all_input_mask = [f.input_mask for f in eval_features]
     all_segment_ids = [f.segment_ids for f in eval_features]
@@ -479,7 +484,7 @@ def evaluate(args, model, weight_path, processor, device, task_name, mode, label
     preds = []
     out_label_ids = None
 
-    for batch in tqdm(eval_dataloader, desc="Evaluating"):
+    for batch in tqdm(eval_dataloader, desc="Evaluating", disable=(not show_detail)):
         inputs, labels = batch
         for key in inputs.keys():
             inputs[key] = inputs[key].to(args.device)
