@@ -1,4 +1,4 @@
-source data/create_data_model/config_model.sh
+source data/create_data_model/config.sh
 
 SHARD_COUNT=0
 rm xarg_list.txt

@@ -1,4 +1,6 @@
 #! /bin/bash
+source config/bash_config.sh
+
 MAX_SEQUENCE_LENGTH=128
 MAX_PREDICTIONS_PER_SEQUENCE=20
 MASKED_LM_PROB=0.15
@@ -7,18 +9,18 @@ DUPE_FACTOR=1
 DO_WITH_RAND=false
 N_LINES_PER_SHARD_APPROX=99000
 
-GPU_LIST=(0 1)    # Adjust this based on memory requirements and available number of cores
+GPU_LIST=(${E_SELECTIVE_MASKING_DOWNSTREAM_MASK_GPU_LIST[@]})    # Adjust this based on memory requirements and available number of cores
 MAX_PROC=${#GPU_LIST[@]}
 
 MODE=rule
-TASK_NAME=absa_term
+TASK_NAME=${E_SELECTIVE_MASKING_DOWNSTREAM_MASK_TASK_NAME}
 
-INPUT_DIR=${HOME}/SelectiveMasking/data/datasets/Aspect-Based-Sentiment-Analysis/14data_lap/
+INPUT_DIR=${E_SELECTIVE_MASKING_DOWNSTREAM_MASK_DATA_DIR}
 
-OUTPUT_DIR=${HOME}/SelectiveMasking/data/datasets/test/full_rule_mask/
+OUTPUT_DIR=${E_SELECTIVE_MASKING_DOWNSTREAM_MASK_OUTPUT_DIR}
 
 # model to generate mask training sets
-BERT_MODEL=${HOME}/SelectiveMasking/results/test/origin/CKPT_1M/42/best_model/
+BERT_MODEL=${E_SELECTIVE_MASKING_DOWNSTREAM_MASK_BERT_MODEL}
 
 TOP_SEN_RATE=1
 THRESHOLD=0.01

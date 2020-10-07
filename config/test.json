@@ -1,0 +1,42 @@
+{
+    "GenePT": {
+        "BERT_MODEL": "pretrain_bert_model/bert-base-uncased/"
+    },
+    "Selective_Masking": {
+        "Finetune_BERT": {
+            "DATA_DIR": "data/datasets/Aspect-Based-Sentiment-Analysis/14data_lap/",
+            "OUTPUT_DIR": "results/test/origin/CKPT_1M/",
+            "GPU_LIST": "3,"
+        },
+        "Downstream_Mask": {
+            "BERT_MODEL": "results/test/origin/CKPT_1M/42/best_model/",
+            "DATA_DIR": "data/datasets/Aspect-Based-Sentiment-Analysis/14data_lap/",
+            "OUTPUT_DIR": "data/datasets/test/full_rule_mask/",
+            "GPU_LIST": "(3 4)",
+            "TASK_NAME": "absa_term"
+        },
+        "Train_NN": {
+            "DATA_DIR": "data/datasets/test/full_rule_mask/merged/",
+            "OUTPUT_DIR": "results/test/full_mask_generator/",
+            "GPU_LIST": "3,"
+        },
+        "In_domain_Mask": {
+            "BERT_MODEL": "results/test/full_mask_generator/best_model/",
+            "DATA_DIR": "data/datasets/yelp_amazon/onem_amazon/",
+            "OUTPUT_DIR": "SelectiveMasking/data/datasets/test/full_amazon/",
+            "GPU_LIST": "(3 4)",
+            "TASK_NAME": "amazon"
+        }
+    },
+    "TaskPT": {
+        "DATA_DIR": "data/datasets/test/full_amazon/model/merged/",
+        "OUTPUT_DIR": "results/test/full_amazon/model/",
+        "GPU_LIST": "3,4,5,6"
+    },
+    "Fine_tuning": {
+        "CKPT": "results/test/full_amazon/model/checkpoints/best_ckpt.pt",
+        "DATA_DIR": "data/datasets/Aspect-Based-Sentiment-Analysis/14data_lap/",
+        "OUTPUT_DIR": "results/test/full_amazon/model/",
+        "GPU_LIST": "3,"
+    }
+}

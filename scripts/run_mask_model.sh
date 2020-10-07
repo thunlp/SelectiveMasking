@@ -1,6 +1,8 @@
-DATA_DIR=${HOME}/SelectiveMasking/data/datasets/test/full_rule_mask/merged/
-OUTPUT_DIR=${HOME}/SelectiveMasking/results/test/full_mask_generator/
-BERT_MODEL=${HOME}/SelectiveMasking/pretrain_bert_model/bert-base-uncased/
+source config/bash_config.sh
+
+DATA_DIR=${E_SELECTIVE_MASKING_TRAIN_NN_DATA_DIR}
+OUTPUT_DIR=${E_SELECTIVE_MASKING_TRAIN_NN_OUTPUT_DIR}
+BERT_MODEL=${E_GENEPT_BERT_MODEL}
 
 CMD="mask_model_pretrain.py"
 CMD+=" --bert_model=${BERT_MODEL}"
@@ -18,6 +20,7 @@ CMD+=" --do_train"
 CMD+=" --do_eval"
 # CMD+=" --save_all"
 
+export CUDA_VISIBLE_DEVICES=${E_SELECTIVE_MASKING_TRAIN_NN_GPU_LIST}
 CMD="python3 ${CMD}"
 
 echo ${CMD}

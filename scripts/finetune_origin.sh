@@ -1,8 +1,10 @@
 SEED=${1:-42}
 
-DATA_DIR=data/datasets/Aspect-Based-Sentiment-Analysis/14data_lap/
-BERT_MODEL=pretrain_bert_model/bert-base-uncased/
-OUTPUT_DIR=results/test/origin/CKPT_1M/${SEED}
+source config/bash_config.sh
+
+DATA_DIR=${E_SELECTIVE_MASKING_FINETUNE_BERT_DATA_DIR}
+BERT_MODEL=${E_GENEPT_BERT_MODEL}
+OUTPUT_DIR=${E_SELECTIVE_MASKING_FINETUNE_BERT_OUTPUT_DIR}/${SEED}
 
 CMD="finetune.py"
 CMD+=" --bert_model=${BERT_MODEL}"
@@ -19,6 +21,8 @@ CMD+=" --do_lower_case"
 CMD+=" --gradient_accumulation_steps 2"
 CMD+=" --seed=${SEED}"
 CMD+=" --fp16"
+
+export CUDA_VISIBLE_DEVICES=${E_SELECTIVE_MASKING_FINETUNE_BERT_GPU_LIST}
 
 CMD="python3 ${CMD}"
 

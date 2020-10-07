@@ -1,5 +1,4 @@
 source data/create_data_rule/config.sh
-
 SHARD_COUNT=0
 rm xarg_list.txt
 touch xarg_list.txt
