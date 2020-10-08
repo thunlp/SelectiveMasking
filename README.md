@@ -8,4 +8,7 @@ The datasets can be downloaded from https://cloud.tsinghua.edu.cn/d/214217e068c5
 
 ## Run the Whole Pipeline
 
-## Seperately Run
+1. Modify `config/test.json` for input path, output path, BERT model path, GPU usage etc.
+
+2. run `bash scripts/run_all_pipeline.sh` .
+
