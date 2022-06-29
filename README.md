@@ -4,7 +4,7 @@ Source code for "Train No Evil: Selective Masking for Task-Guided Pre-Training"
 
 ## Download Data
 
-The datasets can be downloaded from <https://cloud.tsinghua.edu.cn/d/214217e068c543cd8116/>. The datasets need to be put in `data/datasets`.
+The datasets can be downloaded from this [link](https://drive.google.com/file/d/1dnDQO6kCNOe2iCpDl-xJ4XXRKLXq-5yw/view?usp=sharing). The datasets need to be put in `data/datasets`.
 
 ## Run the Whole Pipeline
 
